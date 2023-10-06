@@ -1,6 +1,7 @@
 #ifndef PARTITION_CELL_H_
 #define PARTITION_CELL_H_
 
+#include <cstddef>
 #include <memory>
 #include <vector>
 
@@ -17,8 +18,16 @@ class Cell {
   std::shared_ptr<Cell> prev{};
   std::shared_ptr<Cell> next{};
 
+  std::size_t Offset() const {
+    return offset_;
+  }
+
+  /// @param offset Where the cell locates in the cell array.
+  Cell(std::size_t offset) : offset_{offset} {}
+
  private:
   std::vector<std::shared_ptr<Net>> nets_{};
+  std::size_t offset_;
 };
 
 }  // namespace partition

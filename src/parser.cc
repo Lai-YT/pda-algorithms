@@ -1,8 +1,9 @@
 #include "parser.h"
 
+#include <cstddef>
 #include <istream>
-#include <map>
 #include <string>
+#include <unordered_map>
 
 #include "cell.h"
 #include "net.h"
@@ -34,8 +35,8 @@ void Parser::ParseNetConnection() {
   in_ >> net_name;
   // Each net only appears once in the input, so this must be the first time
   // we see this net. Construct it.
-  auto net = std::make_shared<Net>();
-  net_array_[net_name] = net;
+  auto net = std::make_shared<Net>(net_array_.size());
+  net_array_.push_back(net);
 
   auto cell_name = std::string{};
   bool saw_delimiter = false;
@@ -49,7 +50,7 @@ void Parser::ParseNetConnection() {
       saw_delimiter = true;
     }
 
-    auto cell = GetCell_(cell_name);
+    auto cell = cell_array_.at(GetOffsetOfCell_(cell_name));
     net->AddCell(cell);
     cell->AddNet(net);
   }
@@ -59,21 +60,22 @@ double Parser::GetBalanceFactor() const {
   return balance_factor_;
 }
 
-std::shared_ptr<Cell> Parser::GetCell_(const std::string cell_name) {
-  if (cell_array_.count(cell_name)) {
-    return cell_array_.at(cell_name);
+std::size_t Parser::GetOffsetOfCell_(const std::string cell_name) {
+  if (offset_of_cell_.count(cell_name)) {
+    return offset_of_cell_.at(cell_name);
   }
-  auto cell = std::make_shared<Cell>();
-  cell_array_[cell_name] = cell;
-  return cell;
+  auto cell = std::make_shared<Cell>(cell_array_.size());
+  cell_array_.push_back(cell);
+  offset_of_cell_[cell_name] = cell->Offset();
+  return cell->Offset();
 }
 
-std::map<std::string, std::shared_ptr<Net>> Parser::GetNetArray() const {
+std::vector<std::shared_ptr<Net>> Parser::GetNetArray() const {
   // TODO: coping the entire map is slow
   return net_array_;
 }
 
-std::map<std::string, std::shared_ptr<Cell>> Parser::GetCellArray() const {
+std::vector<std::shared_ptr<Cell>> Parser::GetCellArray() const {
   // TODO: coping the entire map is slow
   return cell_array_;
 }

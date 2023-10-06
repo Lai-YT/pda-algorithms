@@ -2,9 +2,10 @@
 #define PARTITION_PARSER_H_
 
 #include <iosfwd>
-#include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace partition {
 
@@ -20,9 +21,9 @@ class Parser {
   /// @note Is meaningless if called before `Parse`.
   double GetBalanceFactor() const;
   /// @note Is meaningless if called before `Parse`.
-  std::map<std::string, std::shared_ptr<Net>> GetNetArray() const;
+  std::vector<std::shared_ptr<Net>> GetNetArray() const;
   /// @note Is meaningless if called before `Parse`.
-  std::map<std::string, std::shared_ptr<Cell>> GetCellArray() const;
+  std::vector<std::shared_ptr<Cell>> GetCellArray() const;
 
   /// @param in The stream to read characters from.
   Parser(std::istream& in) : in_{in} {}
@@ -31,10 +32,16 @@ class Parser {
   std::istream& in_;
 
   double balance_factor_ = 0.0;
-  std::map<std::string, std::shared_ptr<Net>> net_array_{};
-  std::map<std::string, std::shared_ptr<Cell>> cell_array_{};
 
-  std::shared_ptr<Cell> GetCell_(const std::string cell_name);
+  /// @brief Since a single cell may appear multiple times during parsing, an
+  /// addition data structure is used to check whether it has already been
+  /// constructed, and to locate the constructed cell from the array.
+  std::unordered_map<std::string, std::size_t> offset_of_cell_{};
+
+  std::vector<std::shared_ptr<Net>> net_array_{};
+  std::vector<std::shared_ptr<Cell>> cell_array_{};
+
+  std::size_t GetOffsetOfCell_(const std::string cell_name);
 
   void ParseBalanceFactor_();
   void ParseNetConnection();
