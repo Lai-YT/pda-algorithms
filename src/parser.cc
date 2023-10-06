@@ -13,7 +13,7 @@ using namespace partition;
 void Parser::Parse() {
   ParseBalanceFactor_();
   while (in_) {
-    ParseNetConnection();
+    ParseNetConnection_();
   }
 }
 
@@ -21,7 +21,7 @@ void Parser::ParseBalanceFactor_() {
   in_ >> balance_factor_;
 }
 
-void Parser::ParseNetConnection() {
+void Parser::ParseNetConnection_() {
   // A single input line of the connection of a net has the following format:
   // NET <Net Name> [<Cell Name>]+;
 

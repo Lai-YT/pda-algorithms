@@ -44,7 +44,7 @@ class Parser {
   std::size_t GetOffsetOfCell_(const std::string cell_name);
 
   void ParseBalanceFactor_();
-  void ParseNetConnection();
+  void ParseNetConnection_();
 };
 
 }  // namespace partition
