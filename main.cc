@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
 
+#include "fm_partitioner.h"
 #include "parser.h"
 
 using namespace partition;
@@ -9,8 +10,8 @@ int main(int argc, char const* argv[]) {
   auto in = std::fstream{argv[1]};
   auto parser = Parser{in};
   parser.Parse();
-  std::cout << parser.GetBalanceFactor() << '\n';
-  std::cout << parser.GetCellArray().size() << '\n';
-  std::cout << parser.GetNetArray().size() << '\n';
+  auto partitioner = FmPartitioner{parser.GetBalanceFactor(),
+                                   parser.GetCellArray(), parser.GetNetArray()};
+  partitioner.Partition();
   return 0;
 }

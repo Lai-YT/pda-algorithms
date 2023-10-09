@@ -15,3 +15,5 @@ PointerAlignment: Left
 
 # make git diff clean
 AlignEscapedNewlines: DontAlign
+
+BreakBeforeBinaryOperators: All

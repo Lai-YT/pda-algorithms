@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <utility>
 #include <vector>
 
 namespace partition {
@@ -14,9 +15,31 @@ class Net {
   /// @brief Places the `cell` on this net.
   void AddCell(std::weak_ptr<Cell> cell);
 
+  class Iterator {
+   public:
+    bool IsEnd() const;
+    /// @brief Advances the iterator.
+    void Next();
+    std::shared_ptr<Cell> Get();
+
+    /// @param net The net that has cells to iterate over.
+    Iterator(Net& net) : net_{net} {}
+
+   private:
+    Net& net_;
+    std::size_t i_{0};
+  };
+
+  /// @note Iterator Pattern
+  Iterator GetCellIterator();
+
   std::size_t Offset() const {
     return offset_;
   }
+
+  /// @brief An ordered pair of integers `(A(n), B(n))` which represents the
+  /// number of cells the net `n` has in blocks A and B respectively.
+  std::pair<std::size_t, std::size_t> distribution;
 
   /// @param offset Where the net locates in the net array.
   Net(std::size_t offset) : offset_{offset} {}
