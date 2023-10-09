@@ -20,8 +20,12 @@ class Parser {
 
   /// @note Is meaningless if called before `Parse`.
   double GetBalanceFactor() const;
+
+  /// @brief The NET array described in the paper.
   /// @note Is meaningless if called before `Parse`.
   std::vector<std::shared_ptr<Net>> GetNetArray() const;
+
+  /// @brief The CELL array described in the paper.
   /// @note Is meaningless if called before `Parse`.
   std::vector<std::shared_ptr<Cell>> GetCellArray() const;
 
@@ -38,8 +42,8 @@ class Parser {
   /// constructed, and to locate the constructed cell from the array.
   std::unordered_map<std::string, std::size_t> offset_of_cell_{};
 
-  std::vector<std::shared_ptr<Net>> net_array_{};
-  std::vector<std::shared_ptr<Cell>> cell_array_{};
+  std::vector<std::shared_ptr<Net>> net_arr_{};
+  std::vector<std::shared_ptr<Cell>> cell_arr_{};
 
   std::size_t GetOffsetOfCell_(const std::string cell_name);
 

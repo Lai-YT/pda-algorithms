@@ -11,7 +11,7 @@ class Cell;
 
 class Net {
  public:
-  /// @brief Connects `cell` with this net.
+  /// @brief Places the `cell` on this net.
   void AddCell(std::weak_ptr<Cell> cell);
 
   std::size_t Offset() const {
@@ -22,6 +22,11 @@ class Net {
   Net(std::size_t offset) : offset_{offset} {}
 
  private:
+  /// @note The cells on the net are store internal to the net itself
+  /// instead of in the NET array.
+  /// @note Each of these cells is considered a neighbor of the others.
+  /// @note Using weak_ptr to break the circular referencing between `Cell` and
+  /// `Net`.
   std::vector<std::weak_ptr<Cell>> cells_{};
   std::size_t offset_;
 };

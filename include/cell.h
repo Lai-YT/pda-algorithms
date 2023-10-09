@@ -9,6 +9,7 @@ namespace partition {
 
 class Net;
 
+/// @note Size of all `Cell`s are fixed to be 1.
 class Cell {
  public:
   /// @brief Connects this cell with the `net`.
@@ -26,6 +27,8 @@ class Cell {
   Cell(std::size_t offset) : offset_{offset} {}
 
  private:
+  /// @note The nets that contain the cell are store internal to the cell itself
+  /// instead of in the CELL array.
   std::vector<std::shared_ptr<Net>> nets_{};
   std::size_t offset_;
 };

@@ -35,8 +35,8 @@ void Parser::ParseNetConnection_() {
   in_ >> net_name;
   // Each net only appears once in the input, so this must be the first time
   // we see this net. Construct it.
-  auto net = std::make_shared<Net>(net_array_.size());
-  net_array_.push_back(net);
+  auto net = std::make_shared<Net>(net_arr_.size());
+  net_arr_.push_back(net);
 
   auto cell_name = std::string{};
   bool saw_delimiter = false;
@@ -50,7 +50,7 @@ void Parser::ParseNetConnection_() {
       saw_delimiter = true;
     }
 
-    auto cell = cell_array_.at(GetOffsetOfCell_(cell_name));
+    auto cell = cell_arr_.at(GetOffsetOfCell_(cell_name));
     net->AddCell(cell);
     cell->AddNet(net);
   }
@@ -64,18 +64,18 @@ std::size_t Parser::GetOffsetOfCell_(const std::string cell_name) {
   if (offset_of_cell_.count(cell_name)) {
     return offset_of_cell_.at(cell_name);
   }
-  auto cell = std::make_shared<Cell>(cell_array_.size());
-  cell_array_.push_back(cell);
+  auto cell = std::make_shared<Cell>(cell_arr_.size());
+  cell_arr_.push_back(cell);
   offset_of_cell_[cell_name] = cell->Offset();
   return cell->Offset();
 }
 
 std::vector<std::shared_ptr<Net>> Parser::GetNetArray() const {
   // TODO: coping the entire map is slow
-  return net_array_;
+  return net_arr_;
 }
 
 std::vector<std::shared_ptr<Cell>> Parser::GetCellArray() const {
   // TODO: coping the entire map is slow
-  return cell_array_;
+  return cell_arr_;
 }
