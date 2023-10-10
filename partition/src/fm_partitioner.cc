@@ -30,6 +30,10 @@ FmPartitioner::FmPartitioner(double balance_factor,
                                    return a->NumOfPins() < b->NumOfPins();
                                  }))
                   ->NumOfPins();
+#ifndef NDEBUG
+  std::cerr << "[DEBUG]"
+            << " pmax = " << pmax << '\n';
+#endif
   bucket_a_.pmax = pmax;
   bucket_a_.list.resize(pmax * 2 + 1 /* -pmax ~ pmax */);
   bucket_b_.pmax = pmax;
@@ -55,47 +59,61 @@ void FmPartitioner::Partition() {
     CalculateCellGains_();
     assert(bucket_a_.size + bucket_b_.size == cell_arr_.size());
     RunPass_();
+    std::cerr << "size of history: " << history_.size() << '\n';
+    std::cerr << "number of cells: " << cell_arr_.size() << '\n';
+    // FIXME: missing moves
     assert(history_.size() == cell_arr_.size());
-    auto curr_gain = 0;
-    auto max_gain = 0;
-    auto max_gain_idx = -1;
-    //
+
     // Find the partition that can obtain the max gain and revert all moves
     // after that by flipping the block back.
-    //
-    for (std::size_t i = 0; i < history_.size(); i++) {
-      curr_gain += history_.at(i).gain;
-      // TODO: the new max gain may be obtained by an imbalanced partition, due
-      // to the imbalanced initial partition.
-      if (curr_gain > max_gain) {
-        max_gain = curr_gain;
-        max_gain_idx = i;
-      }
-    }
-    // Revert.
     // Note that if we cannot obtain a positive gain, the max_gain_idx will
     // remain -1, thus reverts all the moves. And under this condition, the
     // partition completes.
+    auto max_gain_idx = FindPartitionOfMaxPositiveGainFromHistory_();
     assert(max_gain_idx + 1 >= 0);
-    for (std::size_t i = max_gain_idx + 1; i < history_.size(); i++) {
-      auto cell = history_.at(i).cell;
-      if (cell->block_tag == BlockTag::kBlockA) {
-        cell->block_tag = BlockTag::kBlockB;
-        a_.Remove(cell);
-        b_.Add(cell);
-      } else {
-        cell->block_tag = BlockTag::kBlockA;
-        a_.Add(cell);
-        b_.Remove(cell);
-      }
-    }
+    RevertAllMovesAfter_(static_cast<std::size_t>(max_gain_idx + 1));
     history_.clear();
     // Free all the cells.
     for (auto& cell : cell_arr_) {
       cell->Free();
     }
-    if (max_gain == 0) {
+    if (max_gain_idx == -1) {
       break;
+    }
+  }
+}
+
+int FmPartitioner::FindPartitionOfMaxPositiveGainFromHistory_() const {
+  auto curr_gain = 0;
+  auto max_gain = 0;
+  auto max_gain_idx = -1;
+  for (std::size_t i = 0; i < history_.size(); i++) {
+    curr_gain += history_.at(i).gain;
+    // TODO: the new max gain may be obtained by an imbalanced partition, due
+    // to the imbalanced initial partition.
+    if (curr_gain > max_gain) {
+      max_gain = curr_gain;
+      max_gain_idx = i;
+    }
+  }
+  return max_gain_idx;
+}
+
+void FmPartitioner::RevertAllMovesAfter_(std::size_t idx) {
+#ifndef NDEBUG
+  std::cerr << "[DEBUG]"
+            << " revert moves after " << idx << '\n';
+#endif
+  for (std::size_t i = idx; i < history_.size(); i++) {
+    auto cell = history_.at(i).cell;
+    if (cell->block_tag == BlockTag::kBlockA) {
+      cell->block_tag = BlockTag::kBlockB;
+      a_.Remove(cell);
+      b_.Add(cell);
+    } else {
+      cell->block_tag = BlockTag::kBlockA;
+      a_.Add(cell);
+      b_.Remove(cell);
     }
   }
 }

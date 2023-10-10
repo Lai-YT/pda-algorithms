@@ -92,6 +92,14 @@ class FmPartitioner {
   /// go through the history and restore the state that has the minimal cut
   /// size.
   std::vector<Record_> history_{};
+
+  /// @return To which move do we obtain the maximum gain. It's an index of the
+  /// `history`. `-1` if no positive gain.
+  /// @note Max gain is equivalent to minimum cut size.
+  int FindPartitionOfMaxPositiveGainFromHistory_() const;
+  /// @brief Reverts all moves starting from the one at index `idx` of the
+  /// `history`.
+  void RevertAllMovesAfter_(std::size_t idx);
 };
 
 }  // namespace partition
