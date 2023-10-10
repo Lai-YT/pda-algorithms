@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "block.h"
+#include "block_tag.h"
 
 namespace partition {
 
@@ -52,17 +53,19 @@ class FmPartitioner {
   void InitPartition_();
 
   /// @brief Calculates the distribution of each nets with respect to the
-  /// initial partition of the cells.
-  void InitDistribution_();
+  /// partition of the cells.
+  void CalculateDistribution_();
 
   /// @brief Calculates the gains of each cells with respect to the initial
   /// partition and builds up the linked list structure between the cells.
-  void InitCellGains_();
+  void CalculateCellGains_();
 
   /// @return Number of cells `net` has on the From side of `cell`.
   std::size_t& F(std::shared_ptr<Cell> cell, std::shared_ptr<Net> net) const;
   /// @return Number of cells `net` has on the To side of `cell`.
   std::size_t& T(std::shared_ptr<Cell> cell, std::shared_ptr<Net> net) const;
+
+  void RunPass_();
 
   std::shared_ptr<Cell> ChooseBaseCell_() const;
 
@@ -80,6 +83,15 @@ class FmPartitioner {
   /// @note Since the size of all cells are fixed to 1, it doesn't have to be
   /// passed.
   bool IsBalancedAfterMoving_(const Block& from, const Block& to) const;
+
+  struct Record_ {
+    int gain;
+    std::shared_ptr<Cell> cell;
+  };
+  /// @brief All moves are recorded in the history. After a single pass, we'll
+  /// go through the history and restore the state that has the minimal cut
+  /// size.
+  std::vector<Record_> history_{};
 };
 
 }  // namespace partition

@@ -6,6 +6,7 @@
 #include <random>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #ifndef NDEBUG
 #include <iostream>
@@ -31,18 +32,78 @@ FmPartitioner::FmPartitioner(double balance_factor,
                   ->NumOfPins();
   bucket_a_.pmax = pmax;
   bucket_a_.list.resize(pmax * 2 + 1 /* -pmax ~ pmax */);
-  bucket_a_.max_gain = -pmax;
   bucket_b_.pmax = pmax;
   bucket_b_.list.resize(pmax * 2 + 1 /* -pmax ~ pmax */);
-  bucket_b_.max_gain = -pmax;
 }
 
 void FmPartitioner::Partition() {
   InitPartition_();
-  InitDistribution_();
-  InitCellGains_();
 
+#ifndef NDEBUG
+  auto pass_count = 1;
+#endif
+  while (true) {
+#ifndef NDEBUG
+    std::cerr << "[DEBUG]"
+              << " --- Pass " << pass_count++ << " ---\n";
+    std::cerr << "[DEBUG]"
+              << " size of block A is " << a_.Size() << '\n';
+    std::cerr << "[DEBUG]"
+              << " size of block B is " << b_.Size() << '\n';
+#endif
+    CalculateDistribution_();
+    CalculateCellGains_();
+    assert(bucket_a_.size + bucket_b_.size == cell_arr_.size());
+    RunPass_();
+    assert(history_.size() == cell_arr_.size());
+    auto curr_gain = 0;
+    auto max_gain = 0;
+    auto max_gain_idx = -1;
+    //
+    // Find the partition that can obtain the max gain and revert all moves
+    // after that by flipping the block back.
+    //
+    for (std::size_t i = 0; i < history_.size(); i++) {
+      curr_gain += history_.at(i).gain;
+      // TODO: the new max gain may be obtained by an imbalanced partition, due
+      // to the imbalanced initial partition.
+      if (curr_gain > max_gain) {
+        max_gain = curr_gain;
+        max_gain_idx = i;
+      }
+    }
+    // Revert.
+    // Note that if we cannot obtain a positive gain, the max_gain_idx will
+    // remain -1, thus reverts all the moves. And under this condition, the
+    // partition completes.
+    assert(max_gain_idx + 1 >= 0);
+    for (std::size_t i = max_gain_idx + 1; i < history_.size(); i++) {
+      auto cell = history_.at(i).cell;
+      if (cell->block_tag == BlockTag::kBlockA) {
+        cell->block_tag = BlockTag::kBlockB;
+        a_.Remove(cell);
+        b_.Add(cell);
+      } else {
+        cell->block_tag = BlockTag::kBlockA;
+        a_.Add(cell);
+        b_.Remove(cell);
+      }
+    }
+    history_.clear();
+    // Free all the cells.
+    for (auto& cell : cell_arr_) {
+      cell->Free();
+    }
+    if (max_gain == 0) {
+      break;
+    }
+  }
+}
+
+void FmPartitioner::RunPass_() {
   while (auto base_cell = ChooseBaseCell_()) {
+    history_.push_back(Record_{base_cell->gain, base_cell});
+
     RemoveCellFromBucket_(base_cell);
 
     base_cell->Lock();
@@ -50,6 +111,11 @@ void FmPartitioner::Partition() {
     auto [from, to] = base_cell->block_tag == BlockTag::kBlockA
                           ? std::tie(a_, b_)
                           : std::tie(b_, a_);
+
+#ifndef NDEBUG
+    std::cerr << "[DEBUG]"
+              << " moving cell " << base_cell->Offset() << "...\n";
+#endif
     for (auto it = base_cell->GetNetIterator(); !it.IsEnd(); it.Next()) {
       auto net = it.Get();
       auto& fn = F(base_cell, net);
@@ -81,7 +147,6 @@ void FmPartitioner::Partition() {
       from.Remove(base_cell);
       ++tn;
       to.Add(base_cell);
-      base_cell->block_tag = to.Tag();
 
       // check critical nets after the move
       if (fn == 0) {
@@ -105,6 +170,13 @@ void FmPartitioner::Partition() {
         }
       }
     }
+#ifndef NDEBUG
+    std::cerr << "[DEBUG]"
+              << " max gain of bucket A is now " << bucket_a_.max_gain << '\n';
+    std::cerr << "[DEBUG]"
+              << " max gain of bucket B is now " << bucket_b_.max_gain << '\n';
+#endif
+    base_cell->block_tag = to.Tag();
   }
 }
 
@@ -140,6 +212,11 @@ std::shared_ptr<Cell> FmPartitioner::ChooseBaseCell_() const {
 }
 
 void FmPartitioner::UpdateCellToGain_(std::shared_ptr<Cell> cell, int gain) {
+#ifndef NDEBUG
+  std::cerr << "[DEBUG]"
+            << " update gain of cell " << cell->Offset() << " to " << gain
+            << '\n';
+#endif
   assert(cell->gain != gain);
 
   RemoveCellFromBucket_(cell);
@@ -237,7 +314,7 @@ void FmPartitioner::InitPartition_() {
 
 /// @details This functions is O(P) if we assume the look up of the hash table
 /// is constant time.
-void FmPartitioner::InitDistribution_() {
+void FmPartitioner::CalculateDistribution_() {
   for (auto& net : net_arr_) {
     auto in_a = std::size_t{0};
     auto in_b = std::size_t{0};
@@ -255,7 +332,9 @@ void FmPartitioner::InitDistribution_() {
 
 /// @details This functions is O(P) if we assume the look up of the hash table
 /// is constant time.
-void FmPartitioner::InitCellGains_() {
+void FmPartitioner::CalculateCellGains_() {
+  bucket_a_.max_gain = -bucket_a_.pmax;
+  bucket_b_.max_gain = -bucket_b_.pmax;
   // Calculates the gains of each cells.
   for (auto& cell : cell_arr_) {
     cell->gain = 0;
