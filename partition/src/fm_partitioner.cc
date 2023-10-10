@@ -11,6 +11,7 @@
 #include <iostream>
 #endif
 
+#include "block_tag.h"
 #include "cell.h"
 #include "net.h"
 
@@ -46,8 +47,9 @@ void FmPartitioner::Partition() {
 
     base_cell->Lock();
 
-    auto [from, to]
-        = a_.Contains(base_cell) ? std::tie(a_, b_) : std::tie(b_, a_);
+    auto [from, to] = base_cell->block_tag == BlockTag::kBlockA
+                          ? std::tie(a_, b_)
+                          : std::tie(b_, a_);
     for (auto it = base_cell->GetNetIterator(); !it.IsEnd(); it.Next()) {
       auto net = it.Get();
       auto& fn = F(base_cell, net);
@@ -65,7 +67,7 @@ void FmPartitioner::Partition() {
         // decrement gain of the only free cell on the net if it's free
         for (auto it = net->GetCellIterator(); !it.IsEnd(); it.Next()) {
           auto neighbor = it.Get();
-          if (to.Contains(neighbor) && neighbor->IsFree()) {
+          if (neighbor->block_tag == to.Tag() && neighbor->IsFree()) {
             UpdateCellToGain_(neighbor, neighbor->gain - 1);
             // Since there's only 1 neighbor in the To block, we can break the
             // loop early.
@@ -79,6 +81,7 @@ void FmPartitioner::Partition() {
       from.Remove(base_cell);
       ++tn;
       to.Add(base_cell);
+      base_cell->block_tag = to.Tag();
 
       // check critical nets after the move
       if (fn == 0) {
@@ -93,7 +96,7 @@ void FmPartitioner::Partition() {
         // increment gain of the only free cell on the net if it's free
         for (auto it = net->GetCellIterator(); !it.IsEnd(); it.Next()) {
           auto neighbor = it.Get();
-          if (to.Contains(neighbor) && neighbor->IsFree()) {
+          if (neighbor->block_tag == to.Tag() && neighbor->IsFree()) {
             UpdateCellToGain_(neighbor, neighbor->gain + 1);
             // Since there's only 1 neighbor in the To block, we can break the
             // loop early.
@@ -190,17 +193,19 @@ void FmPartitioner::AddCellToBucket_(std::shared_ptr<Cell> cell) {
 }
 
 FmPartitioner::Bucket_& FmPartitioner::GetBucket_(std::shared_ptr<Cell> cell) {
-  return a_.Contains(cell) ? bucket_a_ : bucket_b_;
+  return cell->block_tag == BlockTag::kBlockA ? bucket_a_ : bucket_b_;
 }
 
 std::size_t& FmPartitioner::F(std::shared_ptr<Cell> cell,
                               std::shared_ptr<Net> net) const {
-  return a_.Contains(cell) ? net->distribution.first : net->distribution.second;
+  return cell->block_tag == BlockTag::kBlockA ? net->distribution.first
+                                              : net->distribution.second;
 }
 
 std::size_t& FmPartitioner::T(std::shared_ptr<Cell> cell,
                               std::shared_ptr<Net> net) const {
-  return b_.Contains(cell) ? net->distribution.first : net->distribution.second;
+  return cell->block_tag == BlockTag::kBlockB ? net->distribution.first
+                                              : net->distribution.second;
 }
 
 void FmPartitioner::InitPartition_() {
@@ -214,7 +219,13 @@ void FmPartitioner::InitPartition_() {
     // Each cell is equally likely to be placed in block A or block B
     // initially by flipping a coin.
     // If is head (0), put the cell in block A; if is tail (1), in block B.
-    (dist(gen) == 0 ? a_ : b_).Add(cell);
+    if (dist(gen) == 0) {
+      cell->block_tag = BlockTag::kBlockA;
+      a_.Add(cell);
+    } else {
+      cell->block_tag = BlockTag::kBlockB;
+      b_.Add(cell);
+    }
   }
 #ifndef NDEBUG
   std::cerr << "[DEBUG]"
@@ -231,7 +242,7 @@ void FmPartitioner::InitDistribution_() {
     auto in_a = std::size_t{0};
     auto in_b = std::size_t{0};
     for (auto it = net->GetCellIterator(); !it.IsEnd(); it.Next()) {
-      a_.Contains(it.Get()) ? ++in_a : ++in_b;
+      it.Get()->block_tag == BlockTag::kBlockA ? ++in_a : ++in_b;
     }
     net->distribution = {in_a, in_b};
 #ifndef NDEBUG

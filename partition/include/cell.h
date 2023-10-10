@@ -5,6 +5,8 @@
 #include <memory>
 #include <vector>
 
+#include "block_tag.h"
+
 namespace partition {
 
 class Net;
@@ -12,6 +14,8 @@ class Net;
 /// @note Size of all `Cell`s are fixed to be 1.
 class Cell {
  public:
+  BlockTag block_tag;
+
   /// @brief Connects this cell with the `net`.
   void AddNet(std::shared_ptr<Net> net);
 

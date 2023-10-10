@@ -4,6 +4,8 @@
 #include <memory>
 #include <unordered_set>
 
+#include "block_tag.h"
+
 namespace partition {
 
 class Cell;
@@ -17,6 +19,10 @@ class Block {
     return cells_.size();
   }
 
+  BlockTag Tag() const {
+    return tag_;
+  }
+
   void Add(std::shared_ptr<Cell> cell);
   void Add(std::size_t cell);
 
@@ -26,9 +32,12 @@ class Block {
   bool Contains(std::shared_ptr<Cell> cell) const;
   bool Contains(std::size_t cell) const;
 
+  Block(BlockTag tag) : tag_{tag} {}
+
  private:
   /// @brief Offsets of the cells.
   std::unordered_set<std::size_t> cells_;
+  BlockTag tag_;
 };
 
 }  // namespace partition

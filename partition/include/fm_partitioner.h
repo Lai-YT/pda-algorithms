@@ -26,8 +26,8 @@ class FmPartitioner {
   double balance_factor_;
   std::vector<std::shared_ptr<Cell>> cell_arr_;
   std::vector<std::shared_ptr<Net>> net_arr_;
-  Block a_{};
-  Block b_{};
+  Block a_{BlockTag::kBlockA};
+  Block b_{BlockTag::kBlockB};
 
   struct Bucket_ {
     /// @brief The bucket list to track the gains.
@@ -75,7 +75,6 @@ class FmPartitioner {
   /// @note The max gain is not touched.
   void AddCellToBucket_(std::shared_ptr<Cell> cell);
 
-  /// @note Performs a single look up from the hash table.
   Bucket_& GetBucket_(std::shared_ptr<Cell> cell);
 
   /// @note Since the size of all cells are fixed to 1, it doesn't have to be
