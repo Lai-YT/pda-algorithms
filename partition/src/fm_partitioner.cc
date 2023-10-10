@@ -8,13 +8,13 @@
 #include <utility>
 #include <vector>
 
-#ifndef NDEBUG
-#include <iostream>
-#endif
-
 #include "block_tag.h"
 #include "cell.h"
 #include "net.h"
+
+#ifndef NDEBUG
+#include <iostream>
+#endif
 
 using namespace partition;
 
@@ -59,8 +59,11 @@ void FmPartitioner::Partition() {
     CalculateCellGains_();
     assert(bucket_a_.size + bucket_b_.size == cell_arr_.size());
     RunPass_();
+#ifndef NDEBUG
     std::cerr << "size of history: " << history_.size() << '\n';
     std::cerr << "number of cells: " << cell_arr_.size() << '\n';
+#endif
+
     // FIXME: missing moves
     assert(history_.size() == cell_arr_.size());
 
