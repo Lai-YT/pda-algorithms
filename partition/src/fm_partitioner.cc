@@ -216,6 +216,11 @@ std::shared_ptr<Cell> FmPartitioner::ChooseBaseCell_() const {
   }
 
   // Rejecting if moving would cause imbalance.
+  // While the initial partition may be already imbalance, which requires
+  // several moves from the bigger block to the smaller block.
+  if (!IsBalancedAfterMoving_(a_, b_) && !IsBalancedAfterMoving_(b_, a_)) {
+    return a_.Size() > b_.Size() ? high_a : high_b;
+  }
   if (!IsBalancedAfterMoving_(a_, b_)) {
     return high_b;
   }
