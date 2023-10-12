@@ -71,11 +71,11 @@ class FmPartitioner {
 
   void UpdateCellToGain_(std::shared_ptr<Cell> cell, int gain);
 
-  /// @brief Removes the `cell` from the bucket list with respect to its `gain`.
-  /// @note The max gain is not touched.
+  /// @brief Removes the `cell` from the bucket list with respect to its `gain`
+  /// and possibly updates the max gain.
   void RemoveCellFromBucket_(std::shared_ptr<Cell> cell);
-  /// @brief Adds the `cell` to the bucket list with respect to its `gain`.
-  /// @note The max gain is not touched.
+  /// @brief Adds the `cell` to the bucket list with respect to its `gain` and
+  /// possibly updates the max gain.
   void AddCellToBucket_(std::shared_ptr<Cell> cell);
 
   Bucket_& GetBucket_(std::shared_ptr<Cell> cell);

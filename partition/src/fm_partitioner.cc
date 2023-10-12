@@ -121,7 +121,6 @@ void FmPartitioner::RevertAllMovesAfter_(std::size_t idx) {
 
 void FmPartitioner::RunPass_() {
   while (auto base_cell = ChooseBaseCell_()) {
-    // FIXME: need to update the max gain
     RemoveCellFromBucket_(base_cell);
 
     base_cell->Lock();
@@ -246,27 +245,8 @@ void FmPartitioner::UpdateCellToGain_(std::shared_ptr<Cell> cell, int gain) {
   assert(cell->gain != gain);
 
   RemoveCellFromBucket_(cell);
-
-  const auto old_gain = cell->gain;
   cell->gain = gain;
-
   AddCellToBucket_(cell);
-
-  auto& bucket = GetBucket_(cell);
-  // Update the max gain.
-  if (cell->gain > old_gain) {
-    // a higher gain appears
-    bucket.max_gain = cell->gain;
-  } else {
-    // Note that we also check the original max gain itself, so if it's
-    // corresponding list is not empty after the update, the max gain will not
-    // be changed.
-    for (; bucket.max_gain >= -bucket.pmax
-           && !bucket.list.at(bucket.ToIndex(bucket.max_gain));
-         --bucket.max_gain) {
-      /* empty */;
-    }
-  }
 }
 
 void FmPartitioner::RemoveCellFromBucket_(std::shared_ptr<Cell> cell) {
@@ -282,6 +262,15 @@ void FmPartitioner::RemoveCellFromBucket_(std::shared_ptr<Cell> cell) {
     bucket.list.at(bucket.ToIndex(cell->gain)) = cell->next;
   }
   cell->next = cell->prev = nullptr;
+  // Update the max gain.
+  // Note that we also check the original max gain itself, so if it's
+  // corresponding list is not empty after the update, the max gain will not
+  // be changed.
+  for (; bucket.max_gain >= -bucket.pmax
+         && !bucket.list.at(bucket.ToIndex(bucket.max_gain));
+       --bucket.max_gain) {
+    /* empty */;
+  }
 }
 
 void FmPartitioner::AddCellToBucket_(std::shared_ptr<Cell> cell) {
@@ -293,6 +282,8 @@ void FmPartitioner::AddCellToBucket_(std::shared_ptr<Cell> cell) {
     prev_head->prev = cell;
   }
   bucket.list.at(bucket.ToIndex(cell->gain)) = cell;
+  // Adding cells to a bucket can only affect the max gain by increment.
+  bucket.max_gain = std::max(bucket.max_gain, cell->gain);
 }
 
 FmPartitioner::Bucket_& FmPartitioner::GetBucket_(std::shared_ptr<Cell> cell) {
