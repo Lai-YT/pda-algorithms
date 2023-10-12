@@ -87,6 +87,8 @@ class FmPartitioner {
   struct Record_ {
     int gain;
     std::shared_ptr<Cell> cell;
+    /// @brief Whether the partitioning is balanced after this move.
+    bool is_balanced;
   };
   /// @brief All moves are recorded in the history. After a single pass, we'll
   /// go through the history and restore the state that has the minimal cut

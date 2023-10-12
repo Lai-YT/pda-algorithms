@@ -92,9 +92,7 @@ int FmPartitioner::FindPartitionOfMaxPositiveGainFromHistory_() const {
   auto max_gain_idx = -1;
   for (std::size_t i = 0; i < history_.size(); i++) {
     curr_gain += history_.at(i).gain;
-    // TODO: the new max gain may be obtained by an imbalanced partition, due
-    // to the imbalanced initial partition.
-    if (curr_gain > max_gain) {
+    if (curr_gain > max_gain && history_.at(i).is_balanced) {
       max_gain = curr_gain;
       max_gain_idx = i;
     }
@@ -123,8 +121,7 @@ void FmPartitioner::RevertAllMovesAfter_(std::size_t idx) {
 
 void FmPartitioner::RunPass_() {
   while (auto base_cell = ChooseBaseCell_()) {
-    history_.push_back(Record_{base_cell->gain, base_cell});
-
+    // FIXME: need to update the max gain
     RemoveCellFromBucket_(base_cell);
 
     base_cell->Lock();
@@ -133,6 +130,9 @@ void FmPartitioner::RunPass_() {
                           ? std::tie(a_, b_)
                           : std::tie(b_, a_);
 
+    // Add to the history so that we can find the maximal gain of this run.
+    history_.push_back(
+        Record_{base_cell->gain, base_cell, IsBalancedAfterMoving_(from, to)});
 #ifndef NDEBUG
     std::cerr << "[DEBUG]"
               << " moving cell " << base_cell->Offset() << "...\n";
