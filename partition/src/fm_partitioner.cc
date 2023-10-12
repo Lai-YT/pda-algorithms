@@ -13,6 +13,10 @@
 #include "net.h"
 
 #ifndef NDEBUG
+#include <iterator>
+#include <numeric>
+#endif
+#ifndef NDEBUG
 #include <iostream>
 #endif
 
@@ -42,9 +46,9 @@ FmPartitioner::FmPartitioner(double balance_factor,
 
 void FmPartitioner::Partition() {
   InitPartition_();
-
 #ifndef NDEBUG
   auto pass_count = 1;
+  auto expected_cut_size = std::size_t{0};
 #endif
   while (true) {
 #ifndef NDEBUG
@@ -55,16 +59,21 @@ void FmPartitioner::Partition() {
     std::cerr << "[DEBUG]"
               << " size of block B is " << b_.Size() << '\n';
 #endif
+
     CalculateDistribution_();
     CalculateCellGains_();
-    assert(bucket_a_.size + bucket_b_.size == cell_arr_.size());
-    RunPass_();
+
 #ifndef NDEBUG
-    std::cerr << "size of history: " << history_.size() << '\n';
-    std::cerr << "number of cells: " << cell_arr_.size() << '\n';
+    if (expected_cut_size != /* initial dummy value */ 0) {
+      assert(GetCutSize() == expected_cut_size
+               && "decrement of cut size doesn't match with the gain of the "
+                  "pass");
+    }
+    expected_cut_size = GetCutSize();
 #endif
 
-    // FIXME: missing moves
+    assert(bucket_a_.size + bucket_b_.size == cell_arr_.size());
+    RunPass_();
     assert(history_.size() == cell_arr_.size());
 
     // Find the partition that can obtain the max gain and revert all moves
@@ -72,9 +81,15 @@ void FmPartitioner::Partition() {
     // Note that if we cannot obtain a positive gain, the max_gain_idx will
     // remain -1, thus reverts all the moves. And under this condition, the
     // partition completes.
-    auto max_gain_idx = FindPartitionOfMaxPositiveGainFromHistory_();
+    auto max_gain_idx = FindPartitionOfMaxPositiveBalancedGainFromHistory_();
     assert(max_gain_idx + 1 >= 0);
     RevertAllMovesAfter_(static_cast<std::size_t>(max_gain_idx + 1));
+#ifndef NDEBUG
+    auto max_gain = std::accumulate(
+        history_.cbegin(), std::next(history_.cbegin(), max_gain_idx + 1), 0,
+        [](int gain, const auto& record) { return gain + record.gain; });
+    expected_cut_size -= max_gain;
+#endif
     history_.clear();
     // Free all the cells.
     for (auto& cell : cell_arr_) {
@@ -86,7 +101,13 @@ void FmPartitioner::Partition() {
   }
 }
 
-int FmPartitioner::FindPartitionOfMaxPositiveGainFromHistory_() const {
+std::size_t FmPartitioner::GetCutSize() const {
+  auto cut_size = std::count_if(net_arr_.cbegin(), net_arr_.cend(),
+                                [](const auto& net) { return net->IsCut(); });
+  return cut_size;
+}
+
+int FmPartitioner::FindPartitionOfMaxPositiveBalancedGainFromHistory_() const {
   auto curr_gain = 0;
   auto max_gain = 0;
   auto max_gain_idx = -1;
@@ -121,6 +142,10 @@ void FmPartitioner::RevertAllMovesAfter_(std::size_t idx) {
 
 void FmPartitioner::RunPass_() {
   while (auto base_cell = ChooseBaseCell_()) {
+#ifndef NDEBUG
+    std::cerr << "[DEBUG]"
+              << " moving cell " << base_cell->Offset() << "...\n";
+#endif
     RemoveCellFromBucket_(base_cell);
 
     base_cell->Lock();
@@ -132,10 +157,6 @@ void FmPartitioner::RunPass_() {
     // Add to the history so that we can find the maximal gain of this run.
     history_.push_back(
         Record_{base_cell->gain, base_cell, IsBalancedAfterMoving_(from, to)});
-#ifndef NDEBUG
-    std::cerr << "[DEBUG]"
-              << " moving cell " << base_cell->Offset() << "...\n";
-#endif
     for (auto it = base_cell->GetNetIterator(); !it.IsEnd(); it.Next()) {
       auto net = it.Get();
       auto& fn = F(base_cell, net);
@@ -181,7 +202,7 @@ void FmPartitioner::RunPass_() {
         // increment gain of the only free cell on the net if it's free
         for (auto it = net->GetCellIterator(); !it.IsEnd(); it.Next()) {
           auto neighbor = it.Get();
-          if (neighbor->block_tag == to.Tag() && neighbor->IsFree()) {
+          if (neighbor->block_tag == from.Tag() && neighbor->IsFree()) {
             UpdateCellToGain_(neighbor, neighbor->gain + 1);
             // Since there's only 1 neighbor in the To block, we can break the
             // loop early.
@@ -373,10 +394,12 @@ void FmPartitioner::CalculateCellGains_() {
 
 bool FmPartitioner::IsBalancedAfterMoving_(const Block& from,
                                            const Block& to) const {
-  const auto num_of_cells = from.Size() + to.Size();
   const auto size_of_from_after_moving = from.Size() - 1;
-  return balance_factor_ * num_of_cells - 1 <= size_of_from_after_moving
-         && size_of_from_after_moving <= balance_factor_ * num_of_cells + 1;
+  const auto max_cell_size = 1UL;
+  return balance_factor_ * cell_arr_.size() - max_cell_size
+             <= size_of_from_after_moving
+         && size_of_from_after_moving
+                <= balance_factor_ * cell_arr_.size() + max_cell_size;
 }
 
 std::size_t FmPartitioner::Bucket_::ToIndex(int gain) const {

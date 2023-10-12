@@ -40,6 +40,9 @@ class Net {
   /// @brief An ordered pair of integers `(A(n), B(n))` which represents the
   /// number of cells the net `n` has in blocks A and B respectively.
   std::pair<std::size_t, std::size_t> distribution;
+  /// @brief A net is said to be cut if it has at least one cell in each block.
+  /// @note This function is possibly expensive. It may iterate over all nets.
+  bool IsCut() const;
 
   /// @param offset Where the net locates in the net array.
   Net(std::size_t offset) : offset_{offset} {}

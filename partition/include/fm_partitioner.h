@@ -22,6 +22,7 @@ class FmPartitioner {
                 std::vector<std::shared_ptr<Net>> net_array);
 
   void Partition();
+  std::size_t GetCutSize() const;
 
  private:
   double balance_factor_;
@@ -95,10 +96,10 @@ class FmPartitioner {
   /// size.
   std::vector<Record_> history_{};
 
-  /// @return To which move do we obtain the maximum gain. It's an index of the
-  /// `history`. `-1` if no positive gain.
+  /// @return To which move do we obtain the maximum balanced gain. It's an
+  /// index of the `history`. `-1` if no positive gain.
   /// @note Max gain is equivalent to minimum cut size.
-  int FindPartitionOfMaxPositiveGainFromHistory_() const;
+  int FindPartitionOfMaxPositiveBalancedGainFromHistory_() const;
   /// @brief Reverts all moves starting from the one at index `idx` of the
   /// `history`.
   void RevertAllMovesAfter_(std::size_t idx);
