@@ -10,8 +10,8 @@ DEPS = $(OBJS:.o=.d)
 
 all: debug
 
-debug: CXXFLAGS += -O0 -g3
-release: CXXFLAGS += -O3 -DNDEBUG
+debug: CXXFLAGS += -O0 -g3 -DDEBUG
+release: CXXFLAGS += -O3
 debug release &: $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) -o $(TARGET)
 

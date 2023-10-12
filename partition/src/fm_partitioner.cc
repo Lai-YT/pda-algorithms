@@ -16,7 +16,7 @@
 #include <iterator>
 #include <numeric>
 #endif
-#ifndef NDEBUG
+#ifdef DEBUG
 #include <iostream>
 #endif
 
@@ -34,7 +34,7 @@ FmPartitioner::FmPartitioner(double balance_factor,
                                    return a->NumOfPins() < b->NumOfPins();
                                  }))
                   ->NumOfPins();
-#ifndef NDEBUG
+#ifdef DEBUG
   std::cerr << "[DEBUG]"
             << " pmax = " << pmax << '\n';
 #endif
@@ -46,12 +46,14 @@ FmPartitioner::FmPartitioner(double balance_factor,
 
 void FmPartitioner::Partition() {
   InitPartition_();
-#ifndef NDEBUG
+#ifdef DEBUG
   auto pass_count = 1;
+#endif
+#ifndef NDEBUG
   auto expected_cut_size = std::size_t{0};
 #endif
   while (true) {
-#ifndef NDEBUG
+#ifdef DEBUG
     std::cerr << "[DEBUG]"
               << " --- Pass " << pass_count++ << " ---\n";
     std::cerr << "[DEBUG]"
@@ -122,7 +124,7 @@ int FmPartitioner::FindPartitionOfMaxPositiveBalancedGainFromHistory_() const {
 }
 
 void FmPartitioner::RevertAllMovesAfter_(std::size_t idx) {
-#ifndef NDEBUG
+#ifdef DEBUG
   std::cerr << "[DEBUG]"
             << " revert moves after " << idx << '\n';
 #endif
@@ -142,7 +144,7 @@ void FmPartitioner::RevertAllMovesAfter_(std::size_t idx) {
 
 void FmPartitioner::RunPass_() {
   while (auto base_cell = ChooseBaseCell_()) {
-#ifndef NDEBUG
+#ifdef DEBUG
     std::cerr << "[DEBUG]"
               << " moving cell " << base_cell->Offset() << "...\n";
 #endif
@@ -211,7 +213,7 @@ void FmPartitioner::RunPass_() {
         }
       }
     }
-#ifndef NDEBUG
+#ifdef DEBUG
     std::cerr << "[DEBUG]"
               << " max gain of bucket A is now " << bucket_a_.max_gain << '\n';
     std::cerr << "[DEBUG]"
@@ -258,7 +260,7 @@ std::shared_ptr<Cell> FmPartitioner::ChooseBaseCell_() const {
 }
 
 void FmPartitioner::UpdateCellToGain_(std::shared_ptr<Cell> cell, int gain) {
-#ifndef NDEBUG
+#ifdef DEBUG
   std::cerr << "[DEBUG]"
             << " update gain of cell " << cell->Offset() << " to " << gain
             << '\n';
@@ -342,7 +344,7 @@ void FmPartitioner::InitPartition_() {
       b_.Add(cell);
     }
   }
-#ifndef NDEBUG
+#ifdef DEBUG
   std::cerr << "[DEBUG]"
             << " initial size of block A is " << a_.Size() << '\n';
   std::cerr << "[DEBUG]"
@@ -360,7 +362,7 @@ void FmPartitioner::CalculateDistribution_() {
       it.Get()->block_tag == BlockTag::kBlockA ? ++in_a : ++in_b;
     }
     net->distribution = {in_a, in_b};
-#ifndef NDEBUG
+#ifdef DEBUG
     std::cerr << "[DEBUG]"
               << " distribution of net " << net->Offset() << " is (" << in_a
               << ", " << in_b << ")\n";
@@ -381,7 +383,7 @@ void FmPartitioner::CalculateCellGains_() {
       cell->gain += static_cast<int>(F(cell, net) == 1);
       cell->gain -= static_cast<int>(T(cell, net) == 0);
     }
-#ifndef NDEBUG
+#ifdef DEBUG
     std::cerr << "[DEBUG]"
               << " gain of cell " << cell->Offset() << " is " << cell->gain
               << '\n';
