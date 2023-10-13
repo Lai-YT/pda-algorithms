@@ -4,6 +4,7 @@
 #include <istream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "cell.h"
 #include "net.h"
@@ -38,6 +39,8 @@ void Parser::ParseNetConnection_() {
   auto net = std::make_shared<Net>(net_arr_.size());
   net_arr_.push_back(net);
 
+  // Data cleaning; avoid duplicate cells in a single net.
+  auto cells_already_in_this_connection = std::unordered_set<std::size_t>{};
   auto cell_name = std::string{};
   bool saw_delimiter = false;
   while (!saw_delimiter && in_ >> cell_name) {
@@ -49,10 +52,12 @@ void Parser::ParseNetConnection_() {
       cell_name.pop_back();
       saw_delimiter = true;
     }
-
     auto cell = cell_arr_.at(GetOffsetOfCell_(cell_name));
-    net->AddCell(cell);
-    cell->AddNet(net);
+    if (!cells_already_in_this_connection.count(cell->Offset())) {
+      net->AddCell(cell);
+      cell->AddNet(net);
+      cells_already_in_this_connection.insert(cell->Offset());
+    }
   }
 }
 
