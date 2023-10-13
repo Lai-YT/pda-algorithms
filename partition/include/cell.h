@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "block_tag.h"
@@ -15,6 +16,7 @@ class Net;
 class Cell {
  public:
   BlockTag block_tag;
+  std::string name;
 
   /// @brief Connects this cell with the `net`.
   void AddNet(std::shared_ptr<Net> net);

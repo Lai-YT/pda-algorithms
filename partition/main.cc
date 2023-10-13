@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "fm_partitioner.h"
+#include "output_formatter.h"
 #include "parser.h"
 
 namespace partition {
@@ -29,6 +30,10 @@ int main(int argc, char const* argv[]) {
   auto partitioner
       = FmPartitioner{balance_factor, std::move(cell_arr), std::move(net_arr)};
   partitioner.Partition();
-  std::cout << partitioner.GetCutSize() << '\n';
+  auto out = std::ofstream{argv[2]};
+  auto formatter
+      = OutputFormatter{out, partitioner.GetBlockA(), partitioner.GetBlockB(),
+                        partitioner.GetCutSize()};
+  formatter.Out();
   return 0;
 }

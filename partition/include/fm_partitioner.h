@@ -23,6 +23,8 @@ class FmPartitioner {
 
   void Partition();
   std::size_t GetCutSize() const;
+  std::vector<std::shared_ptr<Cell>> GetBlockA() const;
+  std::vector<std::shared_ptr<Cell>> GetBlockB() const;
 
  private:
   double balance_factor_;

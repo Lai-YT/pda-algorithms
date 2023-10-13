@@ -45,7 +45,7 @@ class Parser {
   std::vector<std::shared_ptr<Net>> net_arr_{};
   std::vector<std::shared_ptr<Cell>> cell_arr_{};
 
-  std::size_t GetOffsetOfCell_(const std::string cell_name);
+  std::size_t GetOffsetOfCell_(const std::string& cell_name);
 
   void ParseBalanceFactor_();
   void ParseNetConnection_();

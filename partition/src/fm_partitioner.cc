@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <memory>
 #include <random>
 #include <tuple>
 #include <utility>
@@ -113,6 +114,26 @@ std::size_t FmPartitioner::GetCutSize() const {
   auto cut_size = std::count_if(net_arr_.cbegin(), net_arr_.cend(),
                                 [](const auto& net) { return net->IsCut(); });
   return cut_size;
+}
+
+std::vector<std::shared_ptr<Cell>> FmPartitioner::GetBlockA() const {
+  auto cells_in_block_a = std::vector<std::shared_ptr<Cell>>{};
+  std::copy_if(cell_arr_.cbegin(), cell_arr_.cend(),
+               std::back_inserter(cells_in_block_a), [](const auto& cell) {
+                 return cell->block_tag == BlockTag::kBlockA;
+               });
+  assert(cells_in_block_a.size() == a_.Size());
+  return cells_in_block_a;
+}
+
+std::vector<std::shared_ptr<Cell>> FmPartitioner::GetBlockB() const {
+  auto cells_in_block_b = std::vector<std::shared_ptr<Cell>>{};
+  std::copy_if(cell_arr_.cbegin(), cell_arr_.cend(),
+               std::back_inserter(cells_in_block_b), [](const auto& cell) {
+                 return cell->block_tag == BlockTag::kBlockB;
+               });
+  assert(cells_in_block_b.size() == b_.Size());
+  return cells_in_block_b;
 }
 
 int FmPartitioner::FindPartitionOfMaxPositiveBalancedGainFromHistory_() const {

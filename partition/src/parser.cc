@@ -65,11 +65,12 @@ double Parser::GetBalanceFactor() const {
   return balance_factor_;
 }
 
-std::size_t Parser::GetOffsetOfCell_(const std::string cell_name) {
+std::size_t Parser::GetOffsetOfCell_(const std::string& cell_name) {
   if (offset_of_cell_.count(cell_name)) {
     return offset_of_cell_.at(cell_name);
   }
   auto cell = std::make_shared<Cell>(cell_arr_.size());
+  cell->name = cell_name;
   cell_arr_.push_back(cell);
   offset_of_cell_[cell_name] = cell->Offset();
   return cell->Offset();
