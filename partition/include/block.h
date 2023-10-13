@@ -1,8 +1,8 @@
 #ifndef PARTITION_BLOCK_H_
 #define PARTITION_BLOCK_H_
 
+#include <cstddef>
 #include <memory>
-#include <unordered_set>
 
 #include "block_tag.h"
 
@@ -10,33 +10,29 @@ namespace partition {
 
 class Cell;
 
-/// @brief A block is a set of `Cell`s connected with `Net`s.
+/// @brief A block is simply a counter.
 class Block {
  public:
   std::size_t Size() const {
-    // Since the size of all cells are fixed to 1, the number of cells is the
-    // size of the block.
-    return cells_.size();
+    return size_;
   }
 
   BlockTag Tag() const {
     return tag_;
   }
 
-  void Add(std::shared_ptr<Cell> cell);
-  void Add(std::size_t cell);
+  /// @brief Increments the size counter.
+  /// @note Duplicate cells are counted again.
+  void Add(std::shared_ptr<Cell>);
 
-  void Remove(std::shared_ptr<Cell> cell);
-  void Remove(std::size_t cell);
-
-  bool Contains(std::shared_ptr<Cell> cell) const;
-  bool Contains(std::size_t cell) const;
+  /// @brief Decrements the size counter.
+  /// @note Does not check whether the cell is in the block or not.
+  void Remove(std::shared_ptr<Cell>);
 
   Block(BlockTag tag) : tag_{tag} {}
 
  private:
-  /// @brief Offsets of the cells.
-  std::unordered_set<std::size_t> cells_;
+  std::size_t size_{0};
   BlockTag tag_;
 };
 
