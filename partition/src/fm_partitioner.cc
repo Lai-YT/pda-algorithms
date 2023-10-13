@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstddef>
 #include <memory>
 #include <random>
@@ -431,10 +432,10 @@ bool FmPartitioner::IsBalancedAfterMoving_(const Block& from,
 bool FmPartitioner::IsBalanced_(std::size_t s) const {
   // Balanced means the ratio of the block size over the number of cells is
   // between (0.5 - bf / 2, 0.5 + bf / 2).
-  const auto lb = static_cast<std::size_t>((0.5 - balance_factor_ / 2)
-                                           * cell_arr_.size());
-  const auto ub = static_cast<std::size_t>((0.5 + balance_factor_ / 2)
-                                           * cell_arr_.size());
+  // NOTE: making the lb larger and the up smaller to be conservative on the
+  // bounds.
+  const auto lb = std::ceil((0.5 - balance_factor_ / 2) * cell_arr_.size());
+  const auto ub = std::floor((0.5 + balance_factor_ / 2) * cell_arr_.size());
   return lb <= s && s <= ub;
 }
 
