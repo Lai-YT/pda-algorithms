@@ -98,6 +98,9 @@ void FmPartitioner::Partition() {
       cell->Free();
     }
     if (max_gain_idx == -1) {
+      // Distributions have to be updated according to the change in this pass,
+      // so that the calculation on cut size is correct.
+      CalculateDistribution_();
       break;
     }
   }
