@@ -397,11 +397,13 @@ void FmPartitioner::CalculateCellGains_() {
 bool FmPartitioner::IsBalancedAfterMoving_(const Block& from,
                                            const Block& to) const {
   const auto size_of_from_after_moving = from.Size() - 1;
-  const auto max_cell_size = 1UL;
-  return balance_factor_ * cell_arr_.size() - max_cell_size
-             <= size_of_from_after_moving
-         && size_of_from_after_moving
-                <= balance_factor_ * cell_arr_.size() + max_cell_size;
+  // Balanced means the ratio of the block size over the number of cells is
+  // between (0.5 - bf / 2, 0.5 + bf / 2).
+  const auto lb = static_cast<std::size_t>((0.5 - balance_factor_ / 2)
+                                           * cell_arr_.size());
+  const auto ub = static_cast<std::size_t>((0.5 + balance_factor_ / 2)
+                                           * cell_arr_.size());
+  return lb <= size_of_from_after_moving && size_of_from_after_moving <= ub;
 }
 
 std::size_t FmPartitioner::Bucket_::ToIndex(int gain) const {
