@@ -84,6 +84,10 @@ class FmPartitioner {
   /// @note Since the size of all cells are fixed to 1, it doesn't have to be
   /// passed.
   bool IsBalancedAfterMoving_(const Block& from, const Block& to) const;
+  /// @param s Either the size of block A or block B.
+  /// @note Since the two blocks are complementary, we don't need to check on
+  /// both.
+  bool IsBalanced_(std::size_t) const;
 
   struct Record_ {
     int gain;

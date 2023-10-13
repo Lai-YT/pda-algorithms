@@ -75,6 +75,8 @@ void FmPartitioner::Partition() {
 #endif
 
     assert(bucket_a_.size + bucket_b_.size == cell_arr_.size());
+    assert(bucket_a_.size == a_.Size());
+    assert(bucket_b_.size == b_.Size());
     RunPass_();
     assert(history_.size() == cell_arr_.size());
 
@@ -86,6 +88,7 @@ void FmPartitioner::Partition() {
     auto max_gain_idx = FindPartitionOfMaxPositiveBalancedGainFromHistory_();
     assert(max_gain_idx + 1 >= 0);
     RevertAllMovesAfter_(static_cast<std::size_t>(max_gain_idx + 1));
+    assert(IsBalanced_(a_.Size()));
 #ifndef NDEBUG
     auto max_gain = std::accumulate(
         history_.cbegin(), std::next(history_.cbegin(), max_gain_idx + 1), 0,
@@ -190,9 +193,7 @@ void FmPartitioner::RunPass_() {
 
       // change the net distribution to reflect the move
       --fn;
-      from.Remove(base_cell);
       ++tn;
-      to.Add(base_cell);
 
       // check critical nets after the move
       if (fn == 0) {
@@ -222,6 +223,8 @@ void FmPartitioner::RunPass_() {
     std::cerr << "[DEBUG]"
               << " max gain of bucket B is now " << bucket_b_.max_gain << '\n';
 #endif
+    from.Remove(base_cell);
+    to.Add(base_cell);
     base_cell->block_tag = to.Tag();
   }
 }
@@ -400,13 +403,18 @@ void FmPartitioner::CalculateCellGains_() {
 bool FmPartitioner::IsBalancedAfterMoving_(const Block& from,
                                            const Block& to) const {
   const auto size_of_from_after_moving = from.Size() - 1;
+
+  return IsBalanced_(size_of_from_after_moving);
+}
+
+bool FmPartitioner::IsBalanced_(std::size_t s) const {
   // Balanced means the ratio of the block size over the number of cells is
   // between (0.5 - bf / 2, 0.5 + bf / 2).
   const auto lb = static_cast<std::size_t>((0.5 - balance_factor_ / 2)
                                            * cell_arr_.size());
   const auto ub = static_cast<std::size_t>((0.5 + balance_factor_ / 2)
                                            * cell_arr_.size());
-  return lb <= size_of_from_after_moving && size_of_from_after_moving <= ub;
+  return lb <= s && s <= ub;
 }
 
 std::size_t FmPartitioner::Bucket_::ToIndex(int gain) const {
