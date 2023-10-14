@@ -55,18 +55,14 @@ class FmPartitioner {
   /// @brief Generates the initial partition randomly.
   void InitPartition_();
 
-  /// @brief Calculates the distribution of each nets with respect to the
-  /// partition of the cells.
-  void CalculateDistribution_();
-
   /// @brief Calculates the gains of each cells with respect to the initial
   /// partition and builds up the linked list structure between the cells.
   void CalculateCellGains_();
 
   /// @return Number of cells `net` has on the From side of `cell`.
-  std::size_t& F(std::shared_ptr<Cell> cell, std::shared_ptr<Net> net) const;
+  std::size_t F(std::shared_ptr<Cell> cell, std::shared_ptr<Net> net) const;
   /// @return Number of cells `net` has on the To side of `cell`.
-  std::size_t& T(std::shared_ptr<Cell> cell, std::shared_ptr<Net> net) const;
+  std::size_t T(std::shared_ptr<Cell> cell, std::shared_ptr<Net> net) const;
 
   void RunPass_();
 

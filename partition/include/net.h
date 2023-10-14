@@ -3,7 +3,6 @@
 
 #include <cstddef>
 #include <memory>
-#include <utility>
 #include <vector>
 
 namespace partition {
@@ -14,6 +13,14 @@ class Net {
  public:
   /// @brief Places the `cell` on this net.
   void AddCell(std::weak_ptr<Cell> cell);
+
+  std::size_t NumOfCellsInA() const {
+    return distribution_.in_a;
+  }
+
+  std::size_t NumOfCellsInB() const {
+    return distribution_.in_b;
+  }
 
   class Iterator {
    public:
@@ -37,9 +44,6 @@ class Net {
     return offset_;
   }
 
-  /// @brief An ordered pair of integers `(A(n), B(n))` which represents the
-  /// number of cells the net `n` has in blocks A and B respectively.
-  std::pair<std::size_t, std::size_t> distribution;
   /// @brief A net is said to be cut if it has at least one cell in each block.
   /// @note This function is possibly expensive. It may iterate over all nets.
   bool IsCut() const;
@@ -48,6 +52,9 @@ class Net {
   Net(std::size_t offset) : offset_{offset} {}
 
  private:
+  // For `Cell`s to update the distribution after moving.
+  friend class Cell;
+
   /// @note The cells on the net are store internal to the net itself
   /// instead of in the NET array.
   /// @note Each of these cells is considered a neighbor of the others.
@@ -55,6 +62,14 @@ class Net {
   /// `Net`.
   std::vector<std::weak_ptr<Cell>> cells_{};
   std::size_t offset_;
+
+  /// @brief A pair of integers `(A(n), B(n))` which represents the number of
+  /// cells the net `n` has in blocks A and B respectively.
+  struct Distribution {
+    std::size_t in_a;
+    std::size_t in_b;
+  };
+  Distribution distribution_{0, 0};
 };
 }  // namespace partition
 

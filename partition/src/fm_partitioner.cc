@@ -64,7 +64,6 @@ void FmPartitioner::Partition() {
               << " size of block B is " << b_.Size() << '\n';
 #endif
 
-    CalculateDistribution_();
     CalculateCellGains_();
 
 #ifndef NDEBUG
@@ -103,9 +102,6 @@ void FmPartitioner::Partition() {
       cell->Free();
     }
     if (max_gain_idx == -1) {
-      // Distributions have to be updated according to the change in this pass,
-      // so that the calculation on cut size is correct.
-      CalculateDistribution_();
       break;
     }
   }
@@ -121,7 +117,7 @@ std::vector<std::shared_ptr<Cell>> FmPartitioner::GetBlockA() const {
   auto cells_in_block_a = std::vector<std::shared_ptr<Cell>>{};
   std::copy_if(cell_arr_.cbegin(), cell_arr_.cend(),
                std::back_inserter(cells_in_block_a), [](const auto& cell) {
-                 return cell->block_tag == BlockTag::kBlockA;
+                 return cell->Tag() == BlockTag::kBlockA;
                });
   assert(cells_in_block_a.size() == a_.Size());
   return cells_in_block_a;
@@ -131,7 +127,7 @@ std::vector<std::shared_ptr<Cell>> FmPartitioner::GetBlockB() const {
   auto cells_in_block_b = std::vector<std::shared_ptr<Cell>>{};
   std::copy_if(cell_arr_.cbegin(), cell_arr_.cend(),
                std::back_inserter(cells_in_block_b), [](const auto& cell) {
-                 return cell->block_tag == BlockTag::kBlockB;
+                 return cell->Tag() == BlockTag::kBlockB;
                });
   assert(cells_in_block_b.size() == b_.Size());
   return cells_in_block_b;
@@ -158,12 +154,12 @@ void FmPartitioner::RevertAllMovesAfter_(std::size_t idx) {
 #endif
   for (std::size_t i = idx; i < history_.size(); i++) {
     auto cell = history_.at(i).cell;
-    if (cell->block_tag == BlockTag::kBlockA) {
-      cell->block_tag = BlockTag::kBlockB;
+    if (cell->Tag() == BlockTag::kBlockA) {
+      cell->MoveTo(BlockTag::kBlockB);
       a_.Remove(cell);
       b_.Add(cell);
     } else {
-      cell->block_tag = BlockTag::kBlockA;
+      cell->MoveTo(BlockTag::kBlockA);
       a_.Add(cell);
       b_.Remove(cell);
     }
@@ -176,21 +172,15 @@ void FmPartitioner::RunPass_() {
     std::cerr << "[DEBUG]"
               << " moving cell " << base_cell->Offset() << "...\n";
 #endif
-    RemoveCellFromBucket_(base_cell);
-
-    base_cell->Lock();
-
-    auto [from, to] = base_cell->block_tag == BlockTag::kBlockA
-                          ? std::tie(a_, b_)
-                          : std::tie(b_, a_);
+    auto [from, to] = base_cell->Tag() == BlockTag::kBlockA ? std::tie(a_, b_)
+                                                            : std::tie(b_, a_);
 
     // Add to the history so that we can find the maximal gain of this run.
     history_.push_back(
         Record_{base_cell->gain, base_cell, IsBalancedAfterMoving_(from, to)});
     for (auto it = base_cell->GetNetIterator(); !it.IsEnd(); it.Next()) {
       auto net = it.Get();
-      auto& fn = F(base_cell, net);
-      auto& tn = T(base_cell, net);
+      auto tn = T(base_cell, net);
       // check critical nets before the move
       if (tn == 0) {
         // increment gains of all free cells on the net
@@ -204,7 +194,7 @@ void FmPartitioner::RunPass_() {
         // decrement gain of the only free cell on the net if it's free
         for (auto it = net->GetCellIterator(); !it.IsEnd(); it.Next()) {
           auto neighbor = it.Get();
-          if (neighbor->block_tag == to.Tag() && neighbor->IsFree()) {
+          if (neighbor->Tag() == to.Tag() && neighbor->IsFree()) {
             UpdateCellToGain_(neighbor, neighbor->gain - 1);
             // Since there's only 1 neighbor in the To block, we can break the
             // loop early.
@@ -212,11 +202,20 @@ void FmPartitioner::RunPass_() {
           }
         }
       }
+    }
 
-      // change the net distribution to reflect the move
-      --fn;
-      ++tn;
+    // change the net distribution to reflect the move
+    RemoveCellFromBucket_(base_cell);
+    from.Remove(base_cell);
+    to.Add(base_cell);
+    base_cell->MoveTo(to.Tag());
+    base_cell->Lock();
 
+    for (auto it = base_cell->GetNetIterator(); !it.IsEnd(); it.Next()) {
+      auto net = it.Get();
+      // Notice that after the move, the original From block is now the To
+      // block. A switch on the target of distribution. Not typo.
+      auto fn = T(base_cell, net);
       // check critical nets after the move
       if (fn == 0) {
         // decrement gains of all free cells on the net
@@ -230,7 +229,7 @@ void FmPartitioner::RunPass_() {
         // increment gain of the only free cell on the net if it's free
         for (auto it = net->GetCellIterator(); !it.IsEnd(); it.Next()) {
           auto neighbor = it.Get();
-          if (neighbor->block_tag == from.Tag() && neighbor->IsFree()) {
+          if (neighbor->Tag() == from.Tag() && neighbor->IsFree()) {
             UpdateCellToGain_(neighbor, neighbor->gain + 1);
             // Since there's only 1 neighbor in the To block, we can break the
             // loop early.
@@ -245,9 +244,6 @@ void FmPartitioner::RunPass_() {
     std::cerr << "[DEBUG]"
               << " max gain of bucket B is now " << bucket_b_.max_gain << '\n';
 #endif
-    from.Remove(base_cell);
-    to.Add(base_cell);
-    base_cell->block_tag = to.Tag();
   }
 }
 
@@ -338,21 +334,22 @@ void FmPartitioner::AddCellToBucket_(std::shared_ptr<Cell> cell) {
 }
 
 FmPartitioner::Bucket_& FmPartitioner::GetBucket_(std::shared_ptr<Cell> cell) {
-  return cell->block_tag == BlockTag::kBlockA ? bucket_a_ : bucket_b_;
+  return cell->Tag() == BlockTag::kBlockA ? bucket_a_ : bucket_b_;
 }
 
-std::size_t& FmPartitioner::F(std::shared_ptr<Cell> cell,
-                              std::shared_ptr<Net> net) const {
-  return cell->block_tag == BlockTag::kBlockA ? net->distribution.first
-                                              : net->distribution.second;
+std::size_t FmPartitioner::F(std::shared_ptr<Cell> cell,
+                             std::shared_ptr<Net> net) const {
+  return cell->Tag() == BlockTag::kBlockA ? net->NumOfCellsInA()
+                                          : net->NumOfCellsInB();
 }
 
-std::size_t& FmPartitioner::T(std::shared_ptr<Cell> cell,
-                              std::shared_ptr<Net> net) const {
-  return cell->block_tag == BlockTag::kBlockB ? net->distribution.first
-                                              : net->distribution.second;
+std::size_t FmPartitioner::T(std::shared_ptr<Cell> cell,
+                             std::shared_ptr<Net> net) const {
+  return cell->Tag() == BlockTag::kBlockB ? net->NumOfCellsInA()
+                                          : net->NumOfCellsInB();
 }
 
+/// @details This functions is O(P).
 void FmPartitioner::InitPartition_() {
   // TODO: One should also delete nets with only one cell and a cells that may
   // no longer be on any of the resulting nets.
@@ -365,10 +362,10 @@ void FmPartitioner::InitPartition_() {
     // initially by flipping a coin.
     // If is head (0), put the cell in block A; if is tail (1), in block B.
     if (dist(gen) == 0) {
-      cell->block_tag = BlockTag::kBlockA;
+      cell->SetBlock(BlockTag::kBlockA);
       a_.Add(cell);
     } else {
-      cell->block_tag = BlockTag::kBlockB;
+      cell->SetBlock(BlockTag::kBlockB);
       b_.Add(cell);
     }
   }
@@ -380,26 +377,7 @@ void FmPartitioner::InitPartition_() {
 #endif
 }
 
-/// @details This functions is O(P) if we assume the look up of the hash table
-/// is constant time.
-void FmPartitioner::CalculateDistribution_() {
-  for (auto& net : net_arr_) {
-    auto in_a = std::size_t{0};
-    auto in_b = std::size_t{0};
-    for (auto it = net->GetCellIterator(); !it.IsEnd(); it.Next()) {
-      it.Get()->block_tag == BlockTag::kBlockA ? ++in_a : ++in_b;
-    }
-    net->distribution = {in_a, in_b};
-#ifdef DEBUG
-    std::cerr << "[DEBUG]"
-              << " distribution of net " << net->Offset() << " is (" << in_a
-              << ", " << in_b << ")\n";
-#endif
-  }
-}
-
-/// @details This functions is O(P) if we assume the look up of the hash table
-/// is constant time.
+/// @details This functions is O(P).
 void FmPartitioner::CalculateCellGains_() {
   bucket_a_.max_gain = -bucket_a_.pmax;
   bucket_b_.max_gain = -bucket_b_.pmax;

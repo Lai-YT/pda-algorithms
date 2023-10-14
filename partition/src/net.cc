@@ -11,8 +11,9 @@ void Net::AddCell(std::weak_ptr<Cell> cell) {
 }
 
 bool Net::IsCut() const {
+  assert(distribution_.in_a + distribution_.in_b == cells_.size());
   // To be uncut, either one of the block has to have 0 cell.
-  return distribution.first * distribution.second != 0;
+  return distribution_.in_a * distribution_.in_b != 0;
 }
 
 bool Net::Iterator::IsEnd() const {

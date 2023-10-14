@@ -15,7 +15,19 @@ class Net;
 /// @note Size of all `Cell`s are fixed to be 1.
 class Cell {
  public:
-  BlockTag block_tag;
+  /// @brief Sets the block tag and gives the distribution to each net it's on.
+  /// @note This function is intended to be called only once in the beginning.
+  void SetBlock(BlockTag tag);
+
+  /// @brief Changes the block tag to `tag` and updates the distribution of all
+  /// nets it's on.
+  /// @note Does nothing if moving to the block it's already in.
+  void MoveTo(BlockTag tag);
+
+  BlockTag Tag() const {
+    return block_tag_;
+  }
+
   std::string name;
 
   /// @brief Connects this cell with the `net`.
@@ -66,6 +78,7 @@ class Cell {
   /// instead of in the CELL array.
   std::vector<std::shared_ptr<Net>> nets_{};
   std::size_t offset_;
+  BlockTag block_tag_;
   bool is_locked_{false};
 };
 
