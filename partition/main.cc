@@ -1,4 +1,5 @@
 #include <fstream>
+#include <iostream>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -14,7 +15,13 @@ class Net;
 
 using namespace partition;
 
+void Usage(const char* prog_name);
+
 int main(int argc, char const* argv[]) {
+  if (argc < 3) {
+    Usage(argv[0]);
+    return 1;
+  }
   //
   // Parse input.
   //
@@ -60,4 +67,12 @@ int main(int argc, char const* argv[]) {
   block_b.clear();
 
   return 0;
+}
+
+void Usage(const char* prog_name) {
+  std::cerr << "Usage: " << prog_name << " IN OUT\n";
+  std::cerr << '\n';
+  std::cerr << "Arguments:\n";
+  std::cerr << "    IN     Name of the input net connection file\n";
+  std::cerr << "    OUT    Name of the output partition result file\n";
 }
