@@ -1,10 +1,19 @@
 #include "net.h"
 
 #include <cassert>
+#include <cstddef>
 #include <memory>
 #include <vector>
 
 using namespace partition;
+
+std::size_t Net::NumOfCellsInA() const {
+  return distribution_.in_a;
+}
+
+std::size_t Net::NumOfCellsInB() const {
+  return distribution_.in_b;
+}
 
 void Net::AddCell(std::weak_ptr<Cell> cell) {
   cells_.push_back(cell);

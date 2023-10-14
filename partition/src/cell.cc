@@ -1,12 +1,27 @@
 #include "cell.h"
 
 #include <cassert>
+#include <cstddef>
 #include <memory>
+#include <string_view>
 #include <vector>
 
+#include "block_tag.h"
 #include "net.h"
 
 using namespace partition;
+
+BlockTag Cell::Tag() const {
+  return block_tag_;
+}
+
+std::string_view Cell::Name() const {
+  return name_;
+}
+
+std::size_t Cell::NumOfPins() const {
+  return nets_.size();
+}
 
 void Cell::AddNet(std::shared_ptr<Net> net) {
   nets_.push_back(net);

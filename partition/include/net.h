@@ -14,13 +14,14 @@ class Net {
   /// @brief Places the `cell` on this net.
   void AddCell(std::weak_ptr<Cell> cell);
 
-  std::size_t NumOfCellsInA() const {
-    return distribution_.in_a;
-  }
+  /// @return Number of cells this net has in block A.
+  std::size_t NumOfCellsInA() const;
+  /// @return Number of cells this net has in block B.
+  std::size_t NumOfCellsInB() const;
 
-  std::size_t NumOfCellsInB() const {
-    return distribution_.in_b;
-  }
+  /// @brief A net is said to be cut if it has at least one cell in each block.
+  /// @note This function is possibly expensive. It may iterate over all nets.
+  bool IsCut() const;
 
   class Iterator {
    public:
@@ -37,12 +38,9 @@ class Net {
     std::size_t i_{0};
   };
 
-  /// @note Iterator Pattern
+  /// @brief Gets the iterator which is capable of iterate over the cells.
+  /// @note Iterator Pattern.
   Iterator GetCellIterator();
-
-  /// @brief A net is said to be cut if it has at least one cell in each block.
-  /// @note This function is possibly expensive. It may iterate over all nets.
-  bool IsCut() const;
 
  private:
   // For `Cell`s to update the distribution after moving.
@@ -51,8 +49,8 @@ class Net {
   /// @note The cells on the net are store internal to the net itself
   /// instead of in the NET array.
   /// @note Each of these cells is considered a neighbor of the others.
-  /// @note Using weak_ptr to break the circular referencing between `Cell` and
-  /// `Net`.
+  /// @note Using `weak_ptr` to break the circular referencing between `Cell`
+  /// and `Net`.
   std::vector<std::weak_ptr<Cell>> cells_{};
 
   /// @brief A pair of integers `(A(n), B(n))` which represents the number of

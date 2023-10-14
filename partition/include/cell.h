@@ -26,16 +26,25 @@ class Cell {
   /// @note Does nothing if moving to the block it's already in.
   void MoveTo(BlockTag tag);
 
-  BlockTag Tag() const {
-    return block_tag_;
-  }
+  BlockTag Tag() const;
 
-  std::string_view Name() const {
-    return name_;
-  }
+  std::string_view Name() const;
+
+  /// @brief Equivalent to the number of nets a cell connected with.
+  std::size_t NumOfPins() const;
 
   /// @brief Connects this cell with the `net`.
   void AddNet(std::shared_ptr<Net> net);
+
+  int gain;
+
+  bool IsFree() const;
+  void Lock();
+  void Free();
+
+  // Doubly linked list data structure used in bucket list.
+  std::shared_ptr<Cell> prev{};
+  std::shared_ptr<Cell> next{};
 
   class Iterator {
    public:
@@ -52,23 +61,9 @@ class Cell {
     std::size_t i_{0};
   };
 
-  /// @note Iterator Pattern
+  /// @brief Gets the iterator which is capable of iterate over the nets.
+  /// @note Iterator Pattern.
   Iterator GetNetIterator();
-
-  int gain;
-
-  bool IsFree() const;
-  void Lock();
-  void Free();
-
-  // Doubly linked list data structure used in bucket list.
-  std::shared_ptr<Cell> prev{};
-  std::shared_ptr<Cell> next{};
-
-  /// @brief Equivalent to the number of nets a cell connected with.
-  std::size_t NumOfPins() const {
-    return nets_.size();
-  }
 
   Cell(std::string name) : name_{std::move(name)} {}
 
