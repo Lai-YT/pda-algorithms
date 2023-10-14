@@ -1,5 +1,4 @@
 #include <fstream>
-#include <iostream>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -16,10 +15,14 @@ class Net;
 using namespace partition;
 
 int main(int argc, char const* argv[]) {
+  //
+  // Parse input.
+  //
   auto cell_arr = std::vector<std::shared_ptr<partition::Cell>>{};
   auto net_arr = std::vector<std::shared_ptr<partition::Net>>{};
   auto balance_factor = 0.0;
-  {  // Restrict the scope of the parser to reduce memory consumption.
+  {  // Restrict the scope to avoid overlapping the lifetime of large data
+     // structures.
     auto in = std::fstream{argv[1]};
     auto parser = Parser{in};
     parser.Parse();
@@ -27,13 +30,34 @@ int main(int argc, char const* argv[]) {
     net_arr = parser.GetNetArray();
     balance_factor = parser.GetBalanceFactor();
   }
-  auto partitioner
-      = FmPartitioner{balance_factor, std::move(cell_arr), std::move(net_arr)};
-  partitioner.Partition();
-  auto out = std::ofstream{argv[2]};
-  auto formatter
-      = OutputFormatter{out, partitioner.GetBlockA(), partitioner.GetBlockB(),
-                        partitioner.GetCutSize()};
-  formatter.Out();
+  //
+  // Partition.
+  //
+  auto block_a = std::vector<std::shared_ptr<partition::Cell>>{};
+  auto block_b = std::vector<std::shared_ptr<partition::Cell>>{};
+  auto cut_size = 0UL;
+  {  // Restrict the scope to avoid overlapping the lifetime of large data
+     // structures.
+    auto partitioner = FmPartitioner{balance_factor, std::move(cell_arr),
+                                     std::move(net_arr)};
+    partitioner.Partition();
+    block_a = partitioner.GetBlockA();
+    block_b = partitioner.GetBlockB();
+    cut_size = partitioner.GetCutSize();
+  }
+  cell_arr.clear();
+  net_arr.clear();
+  //
+  // Generate output.
+  //
+  {
+    auto out = std::ofstream{argv[2]};
+    auto formatter = OutputFormatter{out, std::move(block_a),
+                                     std::move(block_b), cut_size};
+    formatter.Out();
+  }
+  block_a.clear();
+  block_b.clear();
+
   return 0;
 }
