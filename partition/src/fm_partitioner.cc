@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "block_tag.h"
+#include "bucket.h"
 #include "cell.h"
 #include "net.h"
 
@@ -40,10 +41,8 @@ FmPartitioner::FmPartitioner(double balance_factor,
   std::cerr << "[DEBUG]"
             << " pmax = " << pmax << '\n';
 #endif
-  bucket_a_.pmax = pmax;
-  bucket_a_.list.resize(pmax * 2 + 1 /* -pmax ~ pmax */);
-  bucket_b_.pmax = pmax;
-  bucket_b_.list.resize(pmax * 2 + 1 /* -pmax ~ pmax */);
+  bucket_a_ = Bucket{pmax};
+  bucket_b_ = Bucket{pmax};
 }
 
 void FmPartitioner::Partition() {
@@ -75,9 +74,9 @@ void FmPartitioner::Partition() {
     expected_cut_size = GetCutSize();
 #endif
 
-    assert(bucket_a_.size + bucket_b_.size == cell_arr_.size());
-    assert(bucket_a_.size == a_.Size());
-    assert(bucket_b_.size == b_.Size());
+    assert(bucket_a_.Size() + bucket_b_.Size() == cell_arr_.size());
+    assert(bucket_a_.Size() == a_.Size());
+    assert(bucket_b_.Size() == b_.Size());
     RunPass_();
     assert(history_.size() == cell_arr_.size());
 
@@ -205,7 +204,7 @@ void FmPartitioner::RunPass_() {
     }
 
     // change the net distribution to reflect the move
-    RemoveCellFromBucket_(base_cell);
+    GetBucketOf_(base_cell).Remove(base_cell);
     from.Remove(base_cell);
     to.Add(base_cell);
     base_cell->MoveTo(to.Tag());
@@ -240,21 +239,25 @@ void FmPartitioner::RunPass_() {
     }
 #ifdef DEBUG
     std::cerr << "[DEBUG]"
-              << " max gain of bucket A is now " << bucket_a_.max_gain << '\n';
+              << " max gain of bucket A is now "
+              << (bucket_a_.Size()
+                      ? std::to_string(bucket_a_.FirstMaxGainCell()->gain)
+                      : "\"empty\"")
+              << '\n';
     std::cerr << "[DEBUG]"
-              << " max gain of bucket B is now " << bucket_b_.max_gain << '\n';
+              << " max gain of bucket B is now "
+              << (bucket_b_.Size()
+                      ? std::to_string(bucket_b_.FirstMaxGainCell()->gain)
+                      : "\"empty\"")
+              << '\n';
 #endif
   }
 }
 
 std::shared_ptr<Cell> FmPartitioner::ChooseBaseCell_() const {
   // Consider the first cell (if any) of highest gain from each bucket array.
-  auto high_a = bucket_a_.size
-                    ? bucket_a_.list.at(bucket_a_.ToIndex(bucket_a_.max_gain))
-                    : nullptr;
-  auto high_b = bucket_b_.size
-                    ? bucket_b_.list.at(bucket_b_.ToIndex(bucket_b_.max_gain))
-                    : nullptr;
+  auto high_a = bucket_a_.Size() ? bucket_a_.FirstMaxGainCell() : nullptr;
+  auto high_b = bucket_b_.Size() ? bucket_b_.FirstMaxGainCell() : nullptr;
 
   // If either one is null, return the other.
   if (!high_a || !high_b) {
@@ -289,51 +292,16 @@ void FmPartitioner::UpdateCellToGain_(std::shared_ptr<Cell> cell, int gain) {
             << " update gain of cell " << cell->Name() << " to " << gain
             << '\n';
 #endif
+  // Although this function doesn't break, some higher level logic may be wrong.
   assert(cell->gain != gain);
 
-  RemoveCellFromBucket_(cell);
+  auto& bucket = GetBucketOf_(cell);
+  bucket.Remove(cell);
   cell->gain = gain;
-  AddCellToBucket_(cell);
+  bucket.Add(cell);
 }
 
-void FmPartitioner::RemoveCellFromBucket_(std::shared_ptr<Cell> cell) {
-  auto& bucket = GetBucket_(cell);
-  --bucket.size;
-  if (cell->next) {
-    cell->next->prev = cell->prev;
-  }
-  if (cell->prev) {
-    cell->prev->next = cell->next;
-  } else {
-    // is head
-    bucket.list.at(bucket.ToIndex(cell->gain)) = cell->next;
-  }
-  cell->next = cell->prev = nullptr;
-  // Update the max gain.
-  // Note that we also check the original max gain itself, so if it's
-  // corresponding list is not empty after the update, the max gain will not
-  // be changed.
-  for (; bucket.max_gain >= -bucket.pmax
-         && !bucket.list.at(bucket.ToIndex(bucket.max_gain));
-       --bucket.max_gain) {
-    /* empty */;
-  }
-}
-
-void FmPartitioner::AddCellToBucket_(std::shared_ptr<Cell> cell) {
-  auto& bucket = GetBucket_(cell);
-  ++bucket.size;
-  auto prev_head = bucket.list.at(bucket.ToIndex(cell->gain));
-  if (prev_head) {
-    cell->next = prev_head;
-    prev_head->prev = cell;
-  }
-  bucket.list.at(bucket.ToIndex(cell->gain)) = cell;
-  // Adding cells to a bucket can only affect the max gain by increment.
-  bucket.max_gain = std::max(bucket.max_gain, cell->gain);
-}
-
-FmPartitioner::Bucket_& FmPartitioner::GetBucket_(std::shared_ptr<Cell> cell) {
+Bucket& FmPartitioner::GetBucketOf_(std::shared_ptr<Cell> cell) {
   return cell->Tag() == BlockTag::kBlockA ? bucket_a_ : bucket_b_;
 }
 
@@ -379,8 +347,9 @@ void FmPartitioner::InitPartition_() {
 
 /// @details This functions is O(P).
 void FmPartitioner::CalculateCellGains_() {
-  bucket_a_.max_gain = -bucket_a_.pmax;
-  bucket_b_.max_gain = -bucket_b_.pmax;
+  bucket_a_ = Bucket{bucket_a_.Pmax()};
+  bucket_b_ = Bucket{bucket_b_.Pmax()};
+
   // Calculates the gains of each cells.
   for (auto& cell : cell_arr_) {
     cell->gain = 0;
@@ -394,9 +363,7 @@ void FmPartitioner::CalculateCellGains_() {
               << " gain of cell " << cell->Name() << " is " << cell->gain
               << '\n';
 #endif
-    AddCellToBucket_(cell);
-    auto& bucket = GetBucket_(cell);
-    bucket.max_gain = std::max(bucket.max_gain, cell->gain);
+    GetBucketOf_(cell).Add(cell);
   }
 }
 
@@ -415,9 +382,4 @@ bool FmPartitioner::IsBalanced_(std::size_t s) const {
   const auto lb = std::ceil((0.5 - balance_factor_ / 2) * cell_arr_.size());
   const auto ub = std::floor((0.5 + balance_factor_ / 2) * cell_arr_.size());
   return lb <= s && s <= ub;
-}
-
-std::size_t FmPartitioner::Bucket_::ToIndex(int gain) const {
-  assert(gain <= pmax);
-  return static_cast<std::size_t>(gain + pmax);
 }

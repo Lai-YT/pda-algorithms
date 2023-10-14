@@ -42,10 +42,6 @@ class Cell {
   void Lock();
   void Free();
 
-  // Doubly linked list data structure used in bucket list.
-  std::shared_ptr<Cell> prev{};
-  std::shared_ptr<Cell> next{};
-
   class Iterator {
    public:
     bool IsEnd() const;
@@ -68,12 +64,19 @@ class Cell {
   Cell(std::string name) : name_{std::move(name)} {}
 
  private:
+  // To maintain the linked list structure along with modification of bucket.
+  friend class Bucket;
+
   std::string name_;
   /// @note The nets that contain the cell are store internal to the cell itself
   /// instead of in the CELL array.
   std::vector<std::shared_ptr<Net>> nets_{};
   BlockTag block_tag_;
   bool is_locked_{false};
+
+  // Doubly linked list data structure used in bucket list.
+  std::shared_ptr<Cell> prev{};
+  std::shared_ptr<Cell> next{};
 };
 
 }  // namespace partition
