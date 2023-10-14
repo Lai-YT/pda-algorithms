@@ -7,7 +7,7 @@ help() {
   echo "Usage: ${0} [-h] [-o FILE] IN"
   echo ""
   echo "    Runs ${PROG} on IN with the inspection of Massif."
-  echo "    The result of the partition discarded."
+  echo "    The result of the partition is discarded."
   echo ""
   echo "Arguments:"
   echo "    IN        Name of the input net connection file"
