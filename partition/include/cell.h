@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "block_tag.h"
@@ -28,7 +30,9 @@ class Cell {
     return block_tag_;
   }
 
-  std::string name;
+  std::string_view Name() const {
+    return name_;
+  }
 
   /// @brief Connects this cell with the `net`.
   void AddNet(std::shared_ptr<Net> net);
@@ -71,9 +75,11 @@ class Cell {
   }
 
   /// @param offset Where the cell locates in the cell array.
-  Cell(std::size_t offset) : offset_{offset} {}
+  Cell(std::string name, std::size_t offset)
+      : name_{std::move(name)}, offset_{offset} {}
 
  private:
+  std::string name_;
   /// @note The nets that contain the cell are store internal to the cell itself
   /// instead of in the CELL array.
   std::vector<std::shared_ptr<Net>> nets_{};
