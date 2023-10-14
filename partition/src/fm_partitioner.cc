@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <random>
 #include <tuple>
@@ -64,6 +65,9 @@ void FmPartitioner::Partition() {
 #endif
 
     CalculateCellGains_();
+    assert(bucket_a_.Size() + bucket_b_.Size() == cell_arr_.size());
+    assert(bucket_a_.Size() == a_.Size());
+    assert(bucket_b_.Size() == b_.Size());
 
 #ifndef NDEBUG
     if (expected_cut_size != /* initial dummy value */ 0) {
@@ -74,25 +78,24 @@ void FmPartitioner::Partition() {
     expected_cut_size = GetCutSize();
 #endif
 
-    assert(bucket_a_.Size() + bucket_b_.Size() == cell_arr_.size());
-    assert(bucket_a_.Size() == a_.Size());
-    assert(bucket_b_.Size() == b_.Size());
+    auto is_initially_balanced = IsBalanced_(a_.Size());
     RunPass_();
     assert(history_.size() == cell_arr_.size());
 
     // Find the partition that can obtain the max gain and revert all moves
     // after that by flipping the block back.
-    // Note that if we cannot obtain a positive gain, the max_gain_idx will
-    // remain -1, thus reverts all the moves. And under this condition, the
-    // partition completes.
-    auto max_gain_idx = FindPartitionOfMaxPositiveBalancedGainFromHistory_();
-    assert(max_gain_idx + 1 >= 0);
-    RevertAllMovesAfter_(static_cast<std::size_t>(max_gain_idx + 1));
+    // Note that if we cannot obtain a positive gain but the initial partition
+    // is not balance, we still have to take the moves. Otherwise if the initial
+    // partition is balanced, the partition completes.
+    auto [max_gain_idx, max_gain] = FindIdxOfMaxBalancedGainFromHistory_();
+    if (max_gain <= 0 && is_initially_balanced) {
+      // Revert the entire pass.
+      RevertAllMovesAfter_(0);
+    } else {
+      RevertAllMovesAfter_(max_gain_idx + 1);
+    }
     assert(IsBalanced_(a_.Size()));
 #ifndef NDEBUG
-    auto max_gain = std::accumulate(
-        history_.cbegin(), std::next(history_.cbegin(), max_gain_idx + 1), 0,
-        [](int gain, const auto& record) { return gain + record.gain; });
     expected_cut_size -= max_gain;
 #endif
     history_.clear();
@@ -100,7 +103,7 @@ void FmPartitioner::Partition() {
     for (auto& cell : cell_arr_) {
       cell->Free();
     }
-    if (max_gain_idx == -1) {
+    if (max_gain <= 0 && is_initially_balanced) {
       break;
     }
   }
@@ -132,10 +135,11 @@ std::vector<std::shared_ptr<Cell>> FmPartitioner::GetBlockB() const {
   return cells_in_block_b;
 }
 
-int FmPartitioner::FindPartitionOfMaxPositiveBalancedGainFromHistory_() const {
+std::pair<std::size_t, int>
+FmPartitioner::FindIdxOfMaxBalancedGainFromHistory_() const {
   auto curr_gain = 0;
-  auto max_gain = 0;
-  auto max_gain_idx = -1;
+  auto max_gain = std::numeric_limits<int>::min();
+  auto max_gain_idx = std::size_t{0};
   for (std::size_t i = 0; i < history_.size(); i++) {
     curr_gain += history_.at(i).gain;
     if (curr_gain > max_gain && history_.at(i).is_balanced) {
@@ -143,7 +147,8 @@ int FmPartitioner::FindPartitionOfMaxPositiveBalancedGainFromHistory_() const {
       max_gain_idx = i;
     }
   }
-  return max_gain_idx;
+  assert(max_gain != std::numeric_limits<int>::min());
+  return {max_gain_idx, max_gain};
 }
 
 void FmPartitioner::RevertAllMovesAfter_(std::size_t idx) {

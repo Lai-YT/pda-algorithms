@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <memory>
 #include <vector>
+#include <utility>
 
 #include "block.h"
 #include "block_tag.h"
@@ -86,10 +87,10 @@ class FmPartitioner {
   /// size.
   std::vector<Record_> history_{};
 
-  /// @return To which move do we obtain the maximum balanced gain. It's an
-  /// index of the `history`. `-1` if no positive gain.
+  /// @return To which move do we obtain the maximum balanced gain, which is an
+  /// index of the `history`, and the maximum balanced gain that we obtained.
   /// @note Max gain is equivalent to minimum cut size.
-  int FindPartitionOfMaxPositiveBalancedGainFromHistory_() const;
+  std::pair<std::size_t, int> FindIdxOfMaxBalancedGainFromHistory_() const;
   /// @brief Reverts all moves starting from the one at index `idx` of the
   /// `history`.
   void RevertAllMovesAfter_(std::size_t idx);
