@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -31,6 +32,10 @@ int main(int argc, char const* argv[]) {
   {  // Restrict the scope to avoid overlapping the lifetime of large data
      // structures.
     auto in = std::fstream{argv[1]};
+    if (!in) {
+      std::perror(argv[1]);
+      return 1;
+    }
     auto parser = Parser{in};
     parser.Parse();
     cell_arr = parser.GetCellArray();
