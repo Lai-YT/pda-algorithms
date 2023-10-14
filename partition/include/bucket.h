@@ -32,7 +32,7 @@ class Bucket {
 
   Bucket(std::size_t pmax = 0)
       : pmax_{pmax},
-        list_{pmax * 2 + 1 /* -pmax ~ pmax */, nullptr},
+        list_(pmax * 2 + 1 /* -pmax ~ pmax */),
         max_gain_{static_cast<int>(-pmax)} {}
 
  private:
@@ -40,7 +40,7 @@ class Bucket {
   std::size_t pmax_;
   /// @brief The bucket list to track the gains.
   /// @note The `Cell` itself is a doubly linked list.
-  std::vector<std::shared_ptr<Cell>> list_;
+  std::vector<std::weak_ptr<Cell>> list_;
   /// @brief The number of cells inside the bucket. They should all be free.
   std::size_t size_{0};
   /// @brief Keep track of the bucket having the a cell of highest gain.

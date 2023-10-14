@@ -75,8 +75,10 @@ class Cell {
   bool is_locked_{false};
 
   // Doubly linked list data structure used in bucket list.
-  std::shared_ptr<Cell> prev{};
-  std::shared_ptr<Cell> next{};
+  // Note that since none of the cells should have their lifetime longer then
+  // the CELL array, we use `weak_ptr` on both sides.
+  std::weak_ptr<Cell> prev{};
+  std::weak_ptr<Cell> next{};
 };
 
 }  // namespace partition
