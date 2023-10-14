@@ -1,7 +1,3 @@
-"""
-Generates a list of `n` Cells and `m` Nets.
-"""
-
 import argparse
 import math
 import random
@@ -45,7 +41,18 @@ def gen(num_of_cells: int, num_of_nets: int) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter,
+        description="""
+Generates a list of Cells and Nets.
+The format is as the following:
+
+    ```
+    <balance factor>
+    NET <net name> [<cell name>]+ ;
+    ```
+""",
+    )
     parser.add_argument("num_of_cells", type=int)
     parser.add_argument("num_of_nets", type=int)
     args: argparse.Namespace = parser.parse_args()
