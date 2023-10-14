@@ -70,20 +70,13 @@ class Cell {
     return nets_.size();
   }
 
-  std::size_t Offset() const {
-    return offset_;
-  }
-
-  /// @param offset Where the cell locates in the cell array.
-  Cell(std::string name, std::size_t offset)
-      : name_{std::move(name)}, offset_{offset} {}
+  Cell(std::string name) : name_{std::move(name)} {}
 
  private:
   std::string name_;
   /// @note The nets that contain the cell are store internal to the cell itself
   /// instead of in the CELL array.
   std::vector<std::shared_ptr<Net>> nets_{};
-  std::size_t offset_;
   BlockTag block_tag_;
   bool is_locked_{false};
 };

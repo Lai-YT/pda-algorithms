@@ -170,7 +170,7 @@ void FmPartitioner::RunPass_() {
   while (auto base_cell = ChooseBaseCell_()) {
 #ifdef DEBUG
     std::cerr << "[DEBUG]"
-              << " moving cell " << base_cell->Offset() << "...\n";
+              << " moving cell " << base_cell->Name() << "...\n";
 #endif
     auto [from, to] = base_cell->Tag() == BlockTag::kBlockA ? std::tie(a_, b_)
                                                             : std::tie(b_, a_);
@@ -286,7 +286,7 @@ std::shared_ptr<Cell> FmPartitioner::ChooseBaseCell_() const {
 void FmPartitioner::UpdateCellToGain_(std::shared_ptr<Cell> cell, int gain) {
 #ifdef DEBUG
   std::cerr << "[DEBUG]"
-            << " update gain of cell " << cell->Offset() << " to " << gain
+            << " update gain of cell " << cell->Name() << " to " << gain
             << '\n';
 #endif
   assert(cell->gain != gain);
@@ -391,7 +391,7 @@ void FmPartitioner::CalculateCellGains_() {
     }
 #ifdef DEBUG
     std::cerr << "[DEBUG]"
-              << " gain of cell " << cell->Offset() << " is " << cell->gain
+              << " gain of cell " << cell->Name() << " is " << cell->gain
               << '\n';
 #endif
     AddCellToBucket_(cell);

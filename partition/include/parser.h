@@ -45,6 +45,7 @@ class Parser {
   std::vector<std::shared_ptr<Net>> net_arr_{};
   std::vector<std::shared_ptr<Cell>> cell_arr_{};
 
+  /// @brief Constructs the cell if haven't seen `cell_name` before.
   std::size_t GetOffsetOfCell_(const std::string& cell_name);
 
   void ParseBalanceFactor_();

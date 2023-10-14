@@ -40,16 +40,9 @@ class Net {
   /// @note Iterator Pattern
   Iterator GetCellIterator();
 
-  std::size_t Offset() const {
-    return offset_;
-  }
-
   /// @brief A net is said to be cut if it has at least one cell in each block.
   /// @note This function is possibly expensive. It may iterate over all nets.
   bool IsCut() const;
-
-  /// @param offset Where the net locates in the net array.
-  Net(std::size_t offset) : offset_{offset} {}
 
  private:
   // For `Cell`s to update the distribution after moving.
@@ -61,7 +54,6 @@ class Net {
   /// @note Using weak_ptr to break the circular referencing between `Cell` and
   /// `Net`.
   std::vector<std::weak_ptr<Cell>> cells_{};
-  std::size_t offset_;
 
   /// @brief A pair of integers `(A(n), B(n))` which represents the number of
   /// cells the net `n` has in blocks A and B respectively.
