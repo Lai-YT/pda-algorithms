@@ -25,5 +25,10 @@ int main(int argc, char const* argv[]) {
   auto tree = SlicingTree{input.blocks};
   std::cout << "Dump polish expression:\n";
   tree.Dump();
+  for (auto i = 0; i < 10; i++) {
+    std::cout << "--- " << i << " ---\n";
+    tree.Perturb();
+    tree.Dump();
+  }
   return 0;
 }
