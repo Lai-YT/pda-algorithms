@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <random>
+#include <variant>
 #include <vector>
 
 #include "block.h"
@@ -19,31 +20,28 @@ using ConstSharedBlockPtr = std::shared_ptr<const Block>;
 class BlockOrCut {
  public:
   ConstSharedBlockPtr GetBlock() const {
-    assert(is_block_);
-    return block_;
+    assert(IsBlock());
+    return std::get<ConstSharedBlockPtr>(block_or_cut_);
   }
 
   Cut GetCut() const {
-    assert(!is_block_);
-    return cut_;
+    assert(IsCut());
+    return std::get<Cut>(block_or_cut_);
   }
 
   bool IsBlock() const {
-    return is_block_;
+    return std::holds_alternative<ConstSharedBlockPtr>(block_or_cut_);
   }
 
   bool IsCut() const {
-    return !is_block_;
+    return std::holds_alternative<Cut>(block_or_cut_);
   }
 
-  BlockOrCut(ConstSharedBlockPtr block)
-      : block_{block}, cut_{/* invalid */}, is_block_{true} {}
-  BlockOrCut(Cut cut) : block_{/* invalid */}, cut_{cut}, is_block_{false} {}
+  BlockOrCut(ConstSharedBlockPtr block) : block_or_cut_{block} {}
+  BlockOrCut(Cut cut) : block_or_cut_{cut} {}
 
  private:
-  ConstSharedBlockPtr block_;
-  Cut cut_;
-  bool is_block_;
+  std::variant<ConstSharedBlockPtr, Cut> block_or_cut_;
 };
 
 class Node;
