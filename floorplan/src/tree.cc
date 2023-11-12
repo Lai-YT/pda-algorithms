@@ -6,12 +6,16 @@
 #include <memory>
 #include <ostream>
 #include <random>
+#include <stack>
 
 using namespace floorplan;
 
-SlicingTree::SlicingTree(std::vector<Block> blocks)
-    : blocks_{std::move(blocks)} {
-  assert(blocks_.size() > 1);
+SlicingTree::SlicingTree(const std::vector<Block>& blocks) {
+  assert(blocks.size() > 1);
+  blocks_.reserve(blocks.size());
+  for (const auto& block : blocks) {
+    blocks_.push_back(std::make_shared<const Block>(block));
+  }
   InitFloorplan_();
 }
 
@@ -19,14 +23,15 @@ void SlicingTree::InitFloorplan_() {
   const auto n = blocks_.size();
   // Initial State: we start with the Polish expression 01V2V3V... nV
   // TODO: select the type of the cuts randomly
-  polish_expr_.push_back(BlockIndexOrCut{0});
+  polish_expr_.push_back(BlockOrCut{blocks_.at(0)});
   number_of_operators_in_subexpression_.push_back(0);
-  for (auto i = std::size_t{1}; i < n; i++) {
-    polish_expr_.push_back(BlockIndexOrCut{i});
+  for (auto itr = std::next(blocks_.begin()), end = blocks_.end(); itr != end;
+       ++itr) {
+    polish_expr_.push_back(BlockOrCut{*itr});
     number_of_operators_in_subexpression_.push_back(
         number_of_operators_in_subexpression_.back());
 
-    polish_expr_.push_back(BlockIndexOrCut{Cut::kV});
+    polish_expr_.push_back(BlockOrCut{Cut::kV});
     number_of_operators_in_subexpression_.push_back(
         number_of_operators_in_subexpression_.back() + 1);
   }
@@ -48,7 +53,7 @@ void SlicingTree::Perturb() {
       // TODO: it may be hard to find a pair of adjacent operands. Use a data
       // structure to record the pairs.
       while (opd + 1 == polish_expr_.size()
-             || !polish_expr_.at(opd + 1).IsIndex()) {
+             || !polish_expr_.at(opd + 1).IsBlock()) {
         opd = SelectOperandIndex_();
       }
       std::swap(polish_expr_.at(opd), polish_expr_.at(opd + 1));
@@ -103,26 +108,53 @@ void SlicingTree::Perturb() {
   }
 }
 
+unsigned SlicingTree::GetArea() {
+  auto stack = std::stack<std::shared_ptr<Node>>{};
+  // TODO: we first use a naive way to re-calculate the area by traversing the
+  // entire tree.
+  for (const auto& block_or_cut : polish_expr_) {
+    if (block_or_cut.IsBlock()) {
+      auto leaf = std::make_shared<BlockNode>(block_or_cut.GetBlock());
+      stack.push(leaf);
+    } else {
+      auto right = stack.top();
+      stack.pop();
+      auto left = stack.top();
+      stack.pop();
+      auto inode
+          = std::make_shared<CutNode>(block_or_cut.GetCut(), left, right);
+
+      right->parent = inode;
+      left->parent = inode;
+      stack.push(inode);
+    }
+  }
+  auto root = stack.top();
+  stack.pop();
+  assert(stack.empty());
+  return root->Height() * root->Width();
+}
+
 std::size_t SlicingTree::SelectOperandIndex_() {
-  auto block_idx_or_cut
-      = BlockIndexOrCut{Cut::kH};  // a dummy initial value that not an operand
+  auto block_or_cut
+      = BlockOrCut{Cut::kH};       // a dummy initial value that not an operand
   auto expr_idx = std::size_t{0};  // a dummy initial value
-  while (!block_idx_or_cut.IsIndex()) {
+  while (!block_or_cut.IsBlock()) {
     expr_idx
         = std::uniform_int_distribution<>{0, polish_expr_.size() - 1}(twister_);
-    block_idx_or_cut = polish_expr_.at(expr_idx);
+    block_or_cut = polish_expr_.at(expr_idx);
   }
   return expr_idx;
 }
 
 std::size_t SlicingTree::SelectOperatorIndex_() {
-  auto block_idx_or_cut
-      = BlockIndexOrCut{0};        // a dummy initial value that not an operator
+  auto block_or_cut
+      = BlockOrCut{0};             // a dummy initial value that not an operator
   auto expr_idx = std::size_t{0};  // a dummy initial value
-  while (!block_idx_or_cut.IsCut()) {
+  while (!block_or_cut.IsCut()) {
     expr_idx
         = std::uniform_int_distribution<>{0, polish_expr_.size() - 1}(twister_);
-    block_idx_or_cut = polish_expr_.at(expr_idx);
+    block_or_cut = polish_expr_.at(expr_idx);
   }
   return expr_idx;
 }
@@ -147,11 +179,11 @@ void SlicingTree::Restore() {
 }
 
 void SlicingTree::Dump(std::ostream& out) const {
-  for (const auto& block_idx_or_cut : polish_expr_) {
-    if (block_idx_or_cut.IsIndex()) {
-      out << blocks_.at(block_idx_or_cut.GetIndex()).name;
+  for (const auto& block_or_cut : polish_expr_) {
+    if (block_or_cut.IsBlock()) {
+      out << block_or_cut.GetBlock()->name;
     } else {
-      out << (block_idx_or_cut.GetCut() == Cut::kH ? 'H' : 'V');
+      out << (block_or_cut.GetCut() == Cut::kH ? 'H' : 'V');
     }
     out << ' ';
   }

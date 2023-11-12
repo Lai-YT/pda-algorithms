@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <memory>
 #include <random>
 #include <vector>
 
@@ -11,35 +12,104 @@
 
 namespace floorplan {
 
-class BlockIndexOrCut {
+/// @brief The block is shared as constant to avoid altering the size of the
+/// it accidentally.
+using ConstSharedBlockPtr = std::shared_ptr<const Block>;
+
+class BlockOrCut {
  public:
-  std::size_t GetIndex() const {
-    assert(is_index_);
-    return index_;
+  ConstSharedBlockPtr GetBlock() const {
+    assert(is_block_);
+    return block_;
   }
 
   Cut GetCut() const {
-    assert(!is_index_);
+    assert(!is_block_);
     return cut_;
   }
 
-  bool IsIndex() const {
-    return is_index_;
+  bool IsBlock() const {
+    return is_block_;
   }
 
   bool IsCut() const {
-    return !is_index_;
+    return !is_block_;
   }
 
-  BlockIndexOrCut(std::size_t index)
-      : index_{index}, cut_{/* invalid */}, is_index_{true} {}
-  BlockIndexOrCut(Cut cut)
-      : index_{/* invalid */}, cut_{cut}, is_index_{false} {}
+  BlockOrCut(ConstSharedBlockPtr block)
+      : block_{block}, cut_{/* invalid */}, is_block_{true} {}
+  BlockOrCut(Cut cut) : block_{/* invalid */}, cut_{cut}, is_block_{false} {}
 
  private:
-  std::size_t index_;
+  ConstSharedBlockPtr block_;
   Cut cut_;
-  bool is_index_;
+  bool is_block_;
+};
+
+class Node;
+class BlockNode;
+class CutNode;
+
+class Node {
+ public:
+  /// @brief The padded width of the entire subtree. For blocks, which are leaf
+  /// nodes, it's equal to the width of the block.
+  virtual unsigned Width() const = 0;
+  /// @brief The padded height of the entire subtree. For blocks, which are leaf
+  /// nodes, it's equal to the height of the block.
+  virtual unsigned Height() const = 0;
+
+  Node(std::shared_ptr<Node> left, std::shared_ptr<Node> right)
+      : left{left}, right{right} {}
+
+  std::weak_ptr<CutNode> parent{};
+  std::shared_ptr<Node> left;
+  std::shared_ptr<Node> right;
+};
+
+class CutNode : public Node {
+ public:
+  unsigned Width() const override {
+    if (cut_ == Cut::kH) {
+      return std::max(left->Width(), right->Width());
+    }
+    return left->Width() + right->Width();
+  }
+
+  unsigned Height() const override {
+    if (cut_ == Cut::kV) {
+      return std::max(left->Height(), right->Height());
+    }
+    return left->Height() + right->Height();
+  }
+
+  CutNode(Cut cut, std::shared_ptr<Node> left, std::shared_ptr<Node> right)
+      : Node{left, right}, cut_{cut} {}
+
+ private:
+  Cut cut_;
+};
+
+class BlockNode : public Node {
+ public:
+  unsigned Width() const override {
+    return width_;
+  }
+
+  unsigned Height() const override {
+    return height_;
+  }
+
+  BlockNode(ConstSharedBlockPtr block)
+      : Node{nullptr, nullptr},
+        block_{block},
+        width_{block->width},
+        height_{block->height} {}
+
+ private:
+  ConstSharedBlockPtr block_;
+  unsigned width_;
+  unsigned height_;
 };
 
 /// @brief The tree for floorplanning.
@@ -58,16 +128,21 @@ class SlicingTree {
   /// @note Only the latest previous  perturbation can be restored.
   void Restore();
 
+  unsigned GetArea();
+
   void Dump(std::ostream& out = std::cout) const;
 
-  SlicingTree(std::vector<Block> blocks);
+  SlicingTree(const std::vector<Block>& blocks);
 
  private:
-  std::vector<Block> blocks_;
-  std::vector<BlockIndexOrCut> prev_polish_expr_{};
-  std::vector<unsigned> prev_number_of_operators_in_subexpression_{};
-  std::vector<BlockIndexOrCut> polish_expr_{};
+  std::vector<ConstSharedBlockPtr> blocks_;
+
+  std::vector<BlockOrCut> polish_expr_{};
+  std::vector<BlockOrCut> prev_polish_expr_{};
+
+  /// @brief For checking the balloting property violation in O(1).
   std::vector<unsigned> number_of_operators_in_subexpression_{};
+  std::vector<unsigned> prev_number_of_operators_in_subexpression_{};
 
   void InitFloorplan_();
 

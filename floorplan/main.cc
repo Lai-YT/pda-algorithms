@@ -29,6 +29,7 @@ int main(int argc, char const* argv[]) {
     std::cout << "--- " << i << " ---\n";
     tree.Perturb();
     tree.Dump();
+    std::cout << "\tarea = " << tree.GetArea() << '\n';
   }
   return 0;
 }
