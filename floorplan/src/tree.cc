@@ -7,8 +7,39 @@
 #include <ostream>
 #include <random>
 #include <stack>
+#include <tuple>
+#include <variant>
+
+#include "cut.h"
+#include "tree_node.h"
 
 using namespace floorplan;
+
+//
+/// BlockOrCut
+//
+
+ConstSharedBlockPtr BlockOrCut::GetBlock() const {
+  assert(IsBlock());
+  return std::get<ConstSharedBlockPtr>(block_or_cut_);
+}
+
+Cut BlockOrCut::GetCut() const {
+  assert(IsCut());
+  return std::get<Cut>(block_or_cut_);
+}
+
+bool BlockOrCut::IsBlock() const {
+  return std::holds_alternative<ConstSharedBlockPtr>(block_or_cut_);
+}
+
+bool BlockOrCut::IsCut() const {
+  return std::holds_alternative<Cut>(block_or_cut_);
+}
+
+//
+// SlicingTree
+//
 
 SlicingTree::SlicingTree(const std::vector<Block>& blocks) {
   assert(blocks.size() > 1);
@@ -20,7 +51,6 @@ SlicingTree::SlicingTree(const std::vector<Block>& blocks) {
 }
 
 void SlicingTree::InitFloorplan_() {
-  const auto n = blocks_.size();
   // Initial State: we start with the Polish expression 01V2V3V... nV
   // TODO: select the type of the cuts randomly
   polish_expr_.push_back(BlockOrCut{blocks_.at(0)});
@@ -35,7 +65,7 @@ void SlicingTree::InitFloorplan_() {
     number_of_operators_in_subexpression_.push_back(
         number_of_operators_in_subexpression_.back() + 1);
   }
-  assert(polish_expr_.size() == 2 * n - 1);
+  assert(polish_expr_.size() == 2 * blocks_.size() - 1);
 }
 
 void SlicingTree::Perturb() {
@@ -109,7 +139,7 @@ void SlicingTree::Perturb() {
 }
 
 unsigned SlicingTree::GetArea() {
-  auto stack = std::stack<std::shared_ptr<Node>>{};
+  auto stack = std::stack<std::shared_ptr<TreeNode>>{};
   // TODO: we first use a naive way to re-calculate the area by traversing the
   // entire tree.
   for (const auto& block_or_cut : polish_expr_) {

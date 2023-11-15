@@ -1,7 +1,6 @@
 #ifndef FLOORPLAN_TREE_H_
 #define FLOORPLAN_TREE_H_
 
-#include <cassert>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -10,104 +9,25 @@
 
 #include "block.h"
 #include "cut.h"
+#include "types.h"
 
 namespace floorplan {
 
-/// @brief The block is shared as constant to avoid altering the size of the
-/// it accidentally.
-using ConstSharedBlockPtr = std::shared_ptr<const Block>;
-
 class BlockOrCut {
  public:
-  ConstSharedBlockPtr GetBlock() const {
-    assert(IsBlock());
-    return std::get<ConstSharedBlockPtr>(block_or_cut_);
-  }
+  ConstSharedBlockPtr GetBlock() const;
 
-  Cut GetCut() const {
-    assert(IsCut());
-    return std::get<Cut>(block_or_cut_);
-  }
+  Cut GetCut() const;
 
-  bool IsBlock() const {
-    return std::holds_alternative<ConstSharedBlockPtr>(block_or_cut_);
-  }
+  bool IsBlock() const;
 
-  bool IsCut() const {
-    return std::holds_alternative<Cut>(block_or_cut_);
-  }
+  bool IsCut() const;
 
   BlockOrCut(ConstSharedBlockPtr block) : block_or_cut_{block} {}
   BlockOrCut(Cut cut) : block_or_cut_{cut} {}
 
  private:
   std::variant<ConstSharedBlockPtr, Cut> block_or_cut_;
-};
-
-class Node;
-class BlockNode;
-class CutNode;
-
-class Node {
- public:
-  /// @brief The padded width of the entire subtree. For blocks, which are leaf
-  /// nodes, it's equal to the width of the block.
-  virtual unsigned Width() const = 0;
-  /// @brief The padded height of the entire subtree. For blocks, which are leaf
-  /// nodes, it's equal to the height of the block.
-  virtual unsigned Height() const = 0;
-
-  Node(std::shared_ptr<Node> left, std::shared_ptr<Node> right)
-      : left{left}, right{right} {}
-
-  std::weak_ptr<CutNode> parent{};
-  std::shared_ptr<Node> left;
-  std::shared_ptr<Node> right;
-};
-
-class CutNode : public Node {
- public:
-  unsigned Width() const override {
-    if (cut_ == Cut::kH) {
-      return std::max(left->Width(), right->Width());
-    }
-    return left->Width() + right->Width();
-  }
-
-  unsigned Height() const override {
-    if (cut_ == Cut::kV) {
-      return std::max(left->Height(), right->Height());
-    }
-    return left->Height() + right->Height();
-  }
-
-  CutNode(Cut cut, std::shared_ptr<Node> left, std::shared_ptr<Node> right)
-      : Node{left, right}, cut_{cut} {}
-
- private:
-  Cut cut_;
-};
-
-class BlockNode : public Node {
- public:
-  unsigned Width() const override {
-    return width_;
-  }
-
-  unsigned Height() const override {
-    return height_;
-  }
-
-  BlockNode(ConstSharedBlockPtr block)
-      : Node{nullptr, nullptr},
-        block_{block},
-        width_{block->width},
-        height_{block->height} {}
-
- private:
-  ConstSharedBlockPtr block_;
-  unsigned width_;
-  unsigned height_;
 };
 
 /// @brief The tree for floorplanning.
