@@ -6,24 +6,24 @@
 
 using namespace floorplan;
 
-unsigned BlockNode::Width() const {
-  return width_;
-}
+TreeNode::~TreeNode() = default;
 
-unsigned BlockNode::Height() const {
-  return height_;
-}
-
-unsigned CutNode::Width() const {
+void CutNode::UpdateWidth() {
   if (cut_ == Cut::kH) {
-    return std::max(left->Width(), right->Width());
+    width_ = std::max(left->Width(), right->Width());
+  } else {
+    width_ = left->Width() + right->Width();
   }
-  return left->Width() + right->Width();
 }
 
-unsigned CutNode::Height() const {
+void CutNode::UpdateHeight() {
   if (cut_ == Cut::kV) {
-    return std::max(left->Height(), right->Height());
+    height_ = std::max(left->Height(), right->Height());
+  } else {
+    height_ = left->Height() + right->Height();
   }
-  return left->Height() + right->Height();
+}
+
+void CutNode::InvertCut() {
+  cut_ = (cut_ == Cut::kH ? Cut::kV : Cut::kH);
 }

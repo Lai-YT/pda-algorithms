@@ -29,6 +29,11 @@ Cut BlockOrCut::GetCut() const {
   return std::get<Cut>(block_or_cut_);
 }
 
+void BlockOrCut::SetCut(Cut cut) {
+  assert(IsCut());
+  block_or_cut_ = cut;
+}
+
 bool BlockOrCut::IsBlock() const {
   return std::holds_alternative<ConstSharedBlockPtr>(block_or_cut_);
 }
@@ -47,27 +52,62 @@ SlicingTree::SlicingTree(const std::vector<Block>& blocks) {
   for (const auto& block : blocks) {
     blocks_.push_back(std::make_shared<const Block>(block));
   }
-  InitFloorplan_();
+  InitFloorplanPolishExpr_();
+  BuildTreeFromPolishExpr_();
 }
 
-void SlicingTree::InitFloorplan_() {
+void SlicingTree::InitFloorplanPolishExpr_() {
   // Initial State: we start with the Polish expression 01V2V3V... nV
   // TODO: select the type of the cuts randomly
-  polish_expr_.push_back(BlockOrCut{blocks_.at(0)});
+  // FIXME: the current type of initial floorplanning will never allow a swap
+  // between an operand and an operator since the balloting property is held in
+  // a strict manner. Swapping always violates the property.
+  polish_expr_.emplace_back(BlockOrCut{blocks_.at(0)});
   number_of_operators_in_subexpression_.push_back(0);
   for (auto itr = std::next(blocks_.begin()), end = blocks_.end(); itr != end;
        ++itr) {
-    polish_expr_.push_back(BlockOrCut{*itr});
+    polish_expr_.emplace_back(BlockOrCut{*itr});
     number_of_operators_in_subexpression_.push_back(
         number_of_operators_in_subexpression_.back());
 
-    polish_expr_.push_back(BlockOrCut{Cut::kV});
+    polish_expr_.emplace_back(BlockOrCut{Cut::kV});
     number_of_operators_in_subexpression_.push_back(
         number_of_operators_in_subexpression_.back() + 1);
   }
   assert(polish_expr_.size() == 2 * blocks_.size() - 1);
 }
 
+void SlicingTree::BuildTreeFromPolishExpr_() {
+  auto stack = std::stack<std::shared_ptr<TreeNode>>{};
+  for (auto& block_or_cut : polish_expr_) {
+    if (block_or_cut.IsBlock()) {
+      auto leaf = std::make_shared<BlockNode>(block_or_cut.GetBlock());
+      stack.push(leaf);
+      // Build the query map so that we can update the tree in O(1) time.
+      block_or_cut.node = leaf;
+    } else {
+      auto right = stack.top();
+      stack.pop();
+      auto left = stack.top();
+      stack.pop();
+      auto inode
+          = std::make_shared<CutNode>(block_or_cut.GetCut(), left, right);
+      block_or_cut.node = inode;
+
+      right->parent = inode;
+      left->parent = inode;
+      stack.push(inode);
+    }
+  }
+  auto root = stack.top();
+  stack.pop();
+  assert(stack.empty());
+
+  prev_root_ = root_;
+  root_ = root;
+}
+
+// TODO: update width and height after the move.
 void SlicingTree::Perturb() {
   Stash_();
   // 1. select one of the three moves
@@ -87,6 +127,7 @@ void SlicingTree::Perturb() {
         opd = SelectOperandIndex_();
       }
       std::swap(polish_expr_.at(opd), polish_expr_.at(opd + 1));
+      SwapTreeNode_(polish_expr_.at(opd).node, polish_expr_.at(opd + 1).node);
     } break;
     case Move::kChainInvert: {
       // Select a chain of operators to invert.
@@ -106,8 +147,13 @@ void SlicingTree::Perturb() {
       }
       for (auto i = li; i < ui; i++) {
         // invert
-        polish_expr_.at(i)
-            = polish_expr_.at(i).GetCut() == Cut::kH ? Cut::kV : Cut::kH;
+        polish_expr_.at(i).SetCut(
+            polish_expr_.at(i).GetCut() == Cut::kH ? Cut::kV : Cut::kH);
+        // Update the tree.
+        assert(std::dynamic_pointer_cast<BlockNode>(polish_expr_.at(i).node)
+               || std::dynamic_pointer_cast<CutNode>(polish_expr_.at(i).node));
+        std::dynamic_pointer_cast<CutNode>(polish_expr_.at(i).node)
+            ->InvertCut();
       }
     } break;
     case Move::kOperandAndOperatorSwap: {
@@ -119,16 +165,22 @@ void SlicingTree::Perturb() {
              || !polish_expr_.at(opd + 1).IsCut()) {
         opd = SelectOperandIndex_();
       }
+      auto opr = opd + 1;
       // The balloting property must hold after the move.
       // Let the number of operators in subexpression 0 ~ (opd + 1) be N_(opd +
       // 1). If 2N_(opd + 1) < opd, the balloting property holds after the move.
       // An additional data structure is used to record such N.
       // Note that since zero-indexed opd doesn't equal to the number of operand
       // + operator in the subexpression, we have to adjust it by 1.
-      if (number_of_operators_in_subexpression_.at(opd + 1) * 2 < (opd + 1)) {
-        std::swap(polish_expr_.at(opd), polish_expr_.at(opd + 1));
+      if (number_of_operators_in_subexpression_.at(opr) * 2 < (opd + 1)) {
+        std::swap(polish_expr_.at(opd), polish_expr_.at(opr));
         number_of_operators_in_subexpression_.at(opd)
             += 1;  // the operator moves to opd
+        // Update the tree.
+        // Note the nodes have been swapped. opd is now the operator.
+        assert(std::dynamic_pointer_cast<CutNode>(polish_expr_.at(opd).node));
+        RotateLeft_(
+            std::dynamic_pointer_cast<CutNode>(polish_expr_.at(opd).node));
       } else {
         Restore();
         Perturb();
@@ -140,31 +192,62 @@ void SlicingTree::Perturb() {
   }
 }
 
-unsigned SlicingTree::GetArea() {
-  auto stack = std::stack<std::shared_ptr<TreeNode>>{};
-  // TODO: we first use a naive way to re-calculate the area by traversing the
-  // entire tree.
-  for (const auto& block_or_cut : polish_expr_) {
-    if (block_or_cut.IsBlock()) {
-      auto leaf = std::make_shared<BlockNode>(block_or_cut.GetBlock());
-      stack.push(leaf);
-    } else {
-      auto right = stack.top();
-      stack.pop();
-      auto left = stack.top();
-      stack.pop();
-      auto inode
-          = std::make_shared<CutNode>(block_or_cut.GetCut(), left, right);
-
-      right->parent = inode;
-      left->parent = inode;
-      stack.push(inode);
-    }
+void SlicingTree::SwapTreeNode_(std::shared_ptr<TreeNode> a,
+                                std::shared_ptr<TreeNode> b) {
+  auto a_parent = a->parent.lock();
+  auto b_parent = b->parent.lock();
+  if (a_parent->left = a) {
+    a_parent->left = b;
+  } else {
+    a_parent->right = b;
   }
-  auto root = stack.top();
-  stack.pop();
-  assert(stack.empty());
-  return root->Height() * root->Width();
+  b->parent = a_parent;
+
+  if (b_parent->left = b) {
+    b_parent->left = a;
+  } else {
+    b_parent->right = a;
+  }
+  a->parent = b_parent;
+}
+
+/// @details Swapping with the operator is equivalent to rotate the operator to
+/// the left. Notice that the operand is always the right child of the operator.
+/// For example, to swap b3 with H:
+/// b1 b2 b3 H H b4 H -> b1 b2 H b3 H b4 H
+///      H                H     //
+///     / \              / \    //
+///    H   b4           H  b4   //
+///   / \       ->     / \      //
+/// b1  [H]          [H] [b3]   //
+///     / \          / \        //
+///    b2 [b3]      b1  b2      //
+void SlicingTree::RotateLeft_(std::shared_ptr<CutNode> opr) {
+  auto opd = opr->right;
+  auto parent = opr->parent.lock();
+  parent->right = opd;
+  opd->parent = parent;
+  //         H                       //
+  //        / \                      //
+  // (par) H   b4         [H] (opr)  //
+  //      / \             /          //
+  //     b1  [b3] (opd)  b2          //
+
+  opr->right = opr->left;
+  opr->left = parent->left;
+  opr->left->parent = opr;
+  //      H            //
+  //     / \           //
+  //    H   b4   [H]   //
+  //     \       / \   //
+  //    [b3]   b1  b2  //
+
+  parent->left = opr;
+  // Note that the parent of opr doesn't change.
+}
+
+unsigned SlicingTree::GetArea() const {
+  return root_->Width() * root_->Height();
 }
 
 std::size_t SlicingTree::SelectOperandIndex_() {
@@ -195,11 +278,13 @@ void SlicingTree::Stash_() {
   prev_polish_expr_ = polish_expr_;
   prev_number_of_operators_in_subexpression_
       = number_of_operators_in_subexpression_;
+  // FIXME: shallow copy
+  prev_root_ = root_;
 }
 
 void SlicingTree::Restore() {
   assert(!prev_polish_expr_.empty()
-         && !prev_number_of_operators_in_subexpression_.empty()
+         && !prev_number_of_operators_in_subexpression_.empty() && prev_root_
          && "no previous polish expression to restore");
 
   polish_expr_ = std::move(prev_polish_expr_);
@@ -208,6 +293,9 @@ void SlicingTree::Restore() {
   number_of_operators_in_subexpression_
       = std::move(prev_number_of_operators_in_subexpression_);
   prev_number_of_operators_in_subexpression_.clear();
+
+  // FIXME: shallow copy
+  root_ = std::move(prev_root_);
 }
 
 void SlicingTree::Dump(std::ostream& out) const {
