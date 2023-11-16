@@ -123,7 +123,9 @@ void SlicingTree::Perturb() {
       // Let the number of operators in subexpression 0 ~ (opd + 1) be N_(opd +
       // 1). If 2N_(opd + 1) < opd, the balloting property holds after the move.
       // An additional data structure is used to record such N.
-      if (number_of_operators_in_subexpression_.at(opd + 1) * 2 < opd) {
+      // Note that since zero-indexed opd doesn't equal to the number of operand
+      // + operator in the subexpression, we have to adjust it by 1.
+      if (number_of_operators_in_subexpression_.at(opd + 1) * 2 < (opd + 1)) {
         std::swap(polish_expr_.at(opd), polish_expr_.at(opd + 1));
         number_of_operators_in_subexpression_.at(opd)
             += 1;  // the operator moves to opd
