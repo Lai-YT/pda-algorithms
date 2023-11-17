@@ -30,17 +30,19 @@ Cut BlockOrCut::GetCut() const {
   return std::get<Cut>(block_or_cut_);
 }
 
-void BlockOrCut::SetCut(Cut cut) {
-  assert(IsCut());
-  block_or_cut_ = cut;
-}
-
 bool BlockOrCut::IsBlock() const {
   return std::holds_alternative<ConstSharedBlockPtr>(block_or_cut_);
 }
 
 bool BlockOrCut::IsCut() const {
   return std::holds_alternative<Cut>(block_or_cut_);
+}
+
+void BlockOrCutWithTreeNodePtr::InvertCut() {
+  assert(IsCut());
+  block_or_cut_ = (GetCut() == Cut::kH ? Cut::kV : Cut::kH);
+  assert(std::dynamic_pointer_cast<CutNode>(node));
+  std::dynamic_pointer_cast<CutNode>(node)->InvertCut();
 }
 
 //
@@ -147,14 +149,7 @@ void SlicingTree::Perturb() {
         ++ui;
       }
       for (auto i = li; i < ui; i++) {
-        // invert
-        polish_expr_.at(i).SetCut(
-            polish_expr_.at(i).GetCut() == Cut::kH ? Cut::kV : Cut::kH);
-        // Update the tree.
-        assert(std::dynamic_pointer_cast<BlockNode>(polish_expr_.at(i).node)
-               || std::dynamic_pointer_cast<CutNode>(polish_expr_.at(i).node));
-        std::dynamic_pointer_cast<CutNode>(polish_expr_.at(i).node)
-            ->InvertCut();
+        polish_expr_.at(i).InvertCut();
       }
       prev_move_ = MoveRecord_{Move::kChainInvert, {li, ui}};
     } break;
@@ -343,10 +338,7 @@ void SlicingTree::Restore() {
     case Move::kChainInvert: {
       auto [li, ui] = prev_move_->index_of_nodes;
       for (auto i = li; i < ui; i++) {
-        polish_expr_.at(i).SetCut(
-            polish_expr_.at(i).GetCut() == Cut::kH ? Cut::kV : Cut::kH);
-        std::dynamic_pointer_cast<CutNode>(polish_expr_.at(i).node)
-            ->InvertCut();
+        polish_expr_.at(i).InvertCut();
       }
     } break;
     case Move::kOperandAndOperatorSwap: {

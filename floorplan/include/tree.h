@@ -20,10 +20,7 @@ class BlockOrCut {
  public:
   ConstSharedBlockPtr GetBlock() const;
 
-  // FIXME: broken encapsulation
-
   Cut GetCut() const;
-  void SetCut(Cut);
 
   bool IsBlock() const;
 
@@ -32,13 +29,16 @@ class BlockOrCut {
   explicit BlockOrCut(ConstSharedBlockPtr block) : block_or_cut_{block} {}
   explicit BlockOrCut(Cut cut) : block_or_cut_{cut} {}
 
- private:
+ protected:
   std::variant<ConstSharedBlockPtr, Cut> block_or_cut_;
 };
 
 class BlockOrCutWithTreeNodePtr : public BlockOrCut {
  public:
   using BlockOrCut::BlockOrCut;
+
+  /// @brief Inverts the cut as well as the node.
+  void InvertCut();
 
   BlockOrCutWithTreeNodePtr(const BlockOrCut& block_or_cut)
       : BlockOrCut{block_or_cut} {}
