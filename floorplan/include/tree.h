@@ -2,9 +2,11 @@
 #define FLOORPLAN_TREE_H_
 
 #include <iostream>
-#include <memory>
-#include <random>
+#include <memory>  // shared_ptr
+#include <optional>
+#include <random>  // mt19937, random_device
 #include <unordered_map>
+#include <utility>  // pair
 #include <variant>
 #include <vector>
 
@@ -69,17 +71,28 @@ class SlicingTree {
  private:
   std::vector<ConstSharedBlockPtr> blocks_;
 
+  /// @brief Record the moves so that we can restore the previous perturbation,
+  /// especially to restore the tree structure. This also helps reduce memory
+  /// consumption by performing a reverse move instead of copying the entire
+  /// data structure.
+  struct MoveRecord_ {
+    Move kind_of_move;
+    /// @note The index of the nodes "before" the move. For swapping between
+    /// operands and operators, the first index is that of the operand. For
+    /// inverting operators, the indices are the lower bound and upper bound
+    /// (exclusive), respectively.
+    std::pair<std::size_t, std::size_t> index_of_nodes;
+  };
+  std::optional<MoveRecord_> prev_move_{};
+
   /// @brief The polish expression is used for simple perturbation.
   std::vector<BlockOrCutWithTreeNodePtr> polish_expr_{};
-  std::vector<BlockOrCutWithTreeNodePtr> prev_polish_expr_{};
 
   /// @brief A tree structure is used to update the area quickly.
   std::shared_ptr<TreeNode> root_{};
-  std::shared_ptr<TreeNode> prev_root_{};
 
   /// @brief For checking the balloting property violation in O(1).
   std::vector<unsigned> number_of_operators_in_subexpression_{};
-  std::vector<unsigned> prev_number_of_operators_in_subexpression_{};
 
   void InitFloorplanPolishExpr_();
   /// @brief Builds the entire tree with respect to the polish expression and
@@ -93,9 +106,9 @@ class SlicingTree {
   /// @param opr The operator (cut node) to swap with.
   void RotateLeft_(std::shared_ptr<CutNode> opr);
 
-  /// @brief Stashes the current polish expression, so that it can be restored
-  /// later.
-  void Stash_();
+  /// @brief The reverse operation of rotate left. Particularly for the
+  /// restoration.
+  void RotateRight_(std::shared_ptr<CutNode> opr);
 
   std::mt19937 twister_{std::random_device{}()};
 
