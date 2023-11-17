@@ -9,7 +9,12 @@ using namespace floorplan;
 
 TreeNode::~TreeNode() = default;
 
-void CutNode::UpdateWidth() {
+void CutNode::Update() {
+  UpdateWidth_();
+  UpdateHeight_();
+}
+
+void CutNode::UpdateWidth_() {
   if (cut_ == Cut::kH) {
     width_ = std::max(left->Width(), right->Width());
   } else {
@@ -17,7 +22,7 @@ void CutNode::UpdateWidth() {
   }
 }
 
-void CutNode::UpdateHeight() {
+void CutNode::UpdateHeight_() {
   if (cut_ == Cut::kV) {
     height_ = std::max(left->Height(), right->Height());
   } else {
@@ -28,14 +33,12 @@ void CutNode::UpdateHeight() {
 void CutNode::InvertCut() {
   cut_ = (cut_ == Cut::kH ? Cut::kV : Cut::kH);
 
-  UpdateWidth();
-  UpdateHeight();
+  Update();
   // TODO: Chained cut nodes are usually inverted together. In such cases, the
   // ancestors are updated multiple time
   for (auto parent_ = parent.lock(); parent_;
        parent_ = parent_->parent.lock()) {
-    parent_->UpdateWidth();
-    parent_->UpdateHeight();
+    parent_->Update();
   }
 }
 

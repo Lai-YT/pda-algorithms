@@ -215,12 +215,10 @@ void SlicingTree::SwapBlockNode_(std::shared_ptr<BlockNode> a,
 
   // TODO: not to update common ancestors twice.
   for (auto parent = a->parent.lock(); parent; parent = parent->parent.lock()) {
-    parent->UpdateWidth();
-    parent->UpdateHeight();
+    parent->Update();
   }
   for (auto parent = b->parent.lock(); parent; parent = parent->parent.lock()) {
-    parent->UpdateWidth();
-    parent->UpdateHeight();
+    parent->Update();
   }
 }
 
@@ -259,8 +257,7 @@ void SlicingTree::RotateLeft_(std::shared_ptr<CutNode> opr) {
   // Note that the parent of opr doesn't change.
 
   for (auto parent = opr; parent; parent = parent->parent.lock()) {
-    parent->UpdateWidth();
-    parent->UpdateHeight();
+    parent->Update();
   }
 }
 
@@ -297,8 +294,7 @@ void SlicingTree::RotateRight_(std::shared_ptr<CutNode> opr) {
   // Note that the parent of opr doesn't change.
 
   for (auto parent = opr; parent; parent = parent->parent.lock()) {
-    parent->UpdateWidth();
-    parent->UpdateHeight();
+    parent->Update();
   }
 }
 

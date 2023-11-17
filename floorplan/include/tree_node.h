@@ -44,11 +44,10 @@ class TreeNode {
 
 class CutNode : public TreeNode {
  public:
-  /// @brief Recomputes the width of the subtree.
-  void UpdateWidth();
-
-  /// @brief Recomputes the height of the subtree.
-  void UpdateHeight();
+  /// @brief Recomputes the width and height of the subtree, ensuring
+  /// synchronized updates.
+  /// @note Bind the update of width and height to avoid overlooking either.
+  void Update();
 
   void InvertCut();
 
@@ -57,12 +56,14 @@ class CutNode : public TreeNode {
   CutNode(Cut cut, std::shared_ptr<TreeNode> left,
           std::shared_ptr<TreeNode> right)
       : TreeNode{left, right}, cut_{cut} {
-    UpdateWidth();
-    UpdateHeight();
+    Update();
   }
 
  private:
   Cut cut_;
+
+  void UpdateWidth_();
+  void UpdateHeight_();
 };
 
 class BlockNode : public TreeNode {
