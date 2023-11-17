@@ -198,14 +198,14 @@ void SlicingTree::SwapTreeNode_(std::shared_ptr<TreeNode> a,
                                 std::shared_ptr<TreeNode> b) {
   auto a_parent = a->parent.lock();
   auto b_parent = b->parent.lock();
-  if (a_parent->left = a) {
+  if (a_parent->left == a) {
     a_parent->left = b;
   } else {
     a_parent->right = b;
   }
   b->parent = a_parent;
 
-  if (b_parent->left = b) {
+  if (b_parent->left == b) {
     b_parent->left = a;
   } else {
     b_parent->right = a;
