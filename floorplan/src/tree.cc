@@ -62,17 +62,12 @@ SlicingTree::SlicingTree(const std::vector<Block>& blocks) {
 void SlicingTree::InitFloorplanPolishExpr_() {
   // Initial State: we start with the Polish expression 01V2V3V... nV
   polish_expr_.emplace_back(BlockOrCut{blocks_.at(0)});
-  number_of_operators_in_subexpression_.push_back(0);
   for (auto itr = std::next(blocks_.begin()), end = blocks_.end(); itr != end;
        ++itr) {
     polish_expr_.emplace_back(BlockOrCut{*itr});
-    number_of_operators_in_subexpression_.push_back(
-        number_of_operators_in_subexpression_.back());
     polish_expr_.emplace_back(BlockOrCut{
         std::uniform_int_distribution<>{0, 1}(twister_) == 0 ? Cut::kV
                                                              : Cut::kH});
-    number_of_operators_in_subexpression_.push_back(
-        number_of_operators_in_subexpression_.back() + 1);
   }
   assert(polish_expr_.size() == 2 * blocks_.size() - 1);
 }
@@ -166,8 +161,6 @@ void SlicingTree::Perturb() {
       // Notice that we're swapping the operator to the right, which never
       // breaks the property.
       std::swap(polish_expr_.at(opd), polish_expr_.at(opr));
-      number_of_operators_in_subexpression_.at(opr)
-          -= 1;  // where the operator was is no longer an operator
       // Update the tree.
       // Note the nodes have been swapped. opd is now the operator.
       auto opr_node
@@ -383,8 +376,7 @@ std::size_t SlicingTree::SelectOperatorIndex_() {
 void SlicingTree::Restore() {
   assert(prev_move_ && "no previous polish expression to restore");
 
-  // Reverses the move on the polish expression, number of operators in the
-  // subexpression (if is operand/operator swap), and the tree.
+  // Reverses the move on the polish expression and the tree.
   switch (prev_move_->kind_of_move) {
     case Move::kOperandSwap: {
       auto [opd_1, opd_2] = prev_move_->index_of_nodes;
@@ -403,8 +395,6 @@ void SlicingTree::Restore() {
     case Move::kOperandAndOperatorSwap: {
       auto [opd, opr] = prev_move_->index_of_nodes;
       std::swap(polish_expr_.at(opd), polish_expr_.at(opr));
-      number_of_operators_in_subexpression_.at(opr)
-          += 1;  // where the operator was is now again the operator
       ReverseBlockNodeWithCutNode_(
           std::dynamic_pointer_cast<BlockNode>(polish_expr_.at(opd).node),
           std::dynamic_pointer_cast<CutNode>(polish_expr_.at(opr).node));

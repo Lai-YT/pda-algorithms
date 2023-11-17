@@ -90,9 +90,6 @@ class SlicingTree {
   /// @brief A tree structure is used to update the area quickly.
   std::shared_ptr<TreeNode> root_{};
 
-  /// @brief For checking the balloting property violation in O(1).
-  std::vector<unsigned> number_of_operators_in_subexpression_{};
-
   void InitFloorplanPolishExpr_();
   /// @brief Builds the entire tree with respect to the polish expression and
   /// sets up the mapping.
