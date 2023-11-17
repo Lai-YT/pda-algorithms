@@ -50,9 +50,9 @@ class BlockOrCutWithTreeNodePtr : public BlockOrCut {
 class SlicingTree {
  public:
   enum Move {
-    kOperandSwap = 1,
+    kBlockSwap = 1,
     kChainInvert = 2,
-    kOperandAndOperatorSwap = 3,
+    kBlockAndCutSwap = 3,
   };
 
   void Perturb();
@@ -77,9 +77,9 @@ class SlicingTree {
   struct MoveRecord_ {
     Move kind_of_move;
     /// @note The index of the nodes "before" the move. For swapping between
-    /// operands and operators, the first index is that of the operand. For
-    /// inverting operators, the indices are the lower bound and upper bound
-    /// (exclusive), respectively.
+    /// blocks and cuts, the first index is that of the block. For inverting
+    /// cuts, the indices are the lower bound and upper bound (exclusive),
+    /// respectively.
     std::pair<std::size_t, std::size_t> index_of_nodes;
   };
   std::optional<MoveRecord_> prev_move_{};
@@ -95,22 +95,22 @@ class SlicingTree {
   /// sets up the mapping.
   void BuildTreeFromPolishExpr_();
 
-  /// @brief Updates the tree for operand/operand swaps.
+  /// @brief Updates the tree for block/block swaps.
   void SwapBlockNode_(std::shared_ptr<BlockNode>, std::shared_ptr<BlockNode>);
 
-  /// @brief Updates the tree for operand/operator swaps.
-  void SwapBlockNodeWithCutNode_(std::shared_ptr<BlockNode> opd,
-                                 std::shared_ptr<CutNode> opr);
+  /// @brief Updates the tree for block/cut swaps.
+  void SwapBlockNodeWithCutNode_(std::shared_ptr<BlockNode> block,
+                                 std::shared_ptr<CutNode> cut);
 
-  /// @brief The reverse operation of the swap between operand and operator.
+  /// @brief The reverse operation of the swap between block and cut.
   /// Particularly for the restoration.
-  void ReverseBlockNodeWithCutNode_(std::shared_ptr<BlockNode> opd,
-                                    std::shared_ptr<CutNode> opr);
+  void ReverseBlockNodeWithCutNode_(std::shared_ptr<BlockNode> block,
+                                    std::shared_ptr<CutNode> cut);
 
   std::mt19937 twister_{std::random_device{}()};
 
-  std::size_t SelectOperandIndex_();
-  std::size_t SelectOperatorIndex_();
+  std::size_t SelectIndexOfBlock_();
+  std::size_t SelectIndexOfCut_();
 };
 
 }  // namespace floorplan
