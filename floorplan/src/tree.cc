@@ -62,9 +62,6 @@ SlicingTree::SlicingTree(const std::vector<Block>& blocks) {
 void SlicingTree::InitFloorplanPolishExpr_() {
   // Initial State: we start with the Polish expression 01V2V3V... nV
   // TODO: select the type of the cuts randomly
-  // FIXME: the current type of initial floorplanning will never allow a swap
-  // between an operand and an operator since the balloting property is held in
-  // a strict manner. Swapping always violates the property.
   polish_expr_.emplace_back(BlockOrCut{blocks_.at(0)});
   number_of_operators_in_subexpression_.push_back(0);
   for (auto itr = std::next(blocks_.begin()), end = blocks_.end(); itr != end;
@@ -156,34 +153,29 @@ void SlicingTree::Perturb() {
     case Move::kOperandAndOperatorSwap: {
       // Swap a pair of adjacent operand and operator
       auto opd = SelectOperandIndex_();
-      // We always choose opd + 1 as the adjacent operator. If opd + 1 is not an
+      // We always choose opd - 1 as the adjacent operator. If opd - 1 is not an
       // operator, select another operand.
-      while (opd + 1 == polish_expr_.size()
-             || !polish_expr_.at(opd + 1).IsCut()) {
+      // FIXME: Infinite loop occurs when all operands are on the left side
+      // and operators are on the right side of the expression.
+      // No operand can be selected in this configuration.
+      while (opd == 0 || !polish_expr_.at(opd - 1).IsCut()) {
         opd = SelectOperandIndex_();
       }
-      auto opr = opd + 1;
+      auto opr = opd - 1;
       // The balloting property must hold after the move.
-      // Let the number of operators in subexpression 0 ~ (opd + 1) be N_(opd +
-      // 1). If 2N_(opd + 1) < opd, the balloting property holds after the move.
-      // An additional data structure is used to record such N.
-      // Note that since zero-indexed opd doesn't equal to the number of operand
-      // + operator in the subexpression, we have to adjust it by 1.
-      if (number_of_operators_in_subexpression_.at(opr) * 2 < (opd + 1)) {
-        std::swap(polish_expr_.at(opd), polish_expr_.at(opr));
-        number_of_operators_in_subexpression_.at(opd)
-            += 1;  // the operator moves to opd
-        // Update the tree.
-        // Note the nodes have been swapped. opd is now the operator.
-        assert(std::dynamic_pointer_cast<CutNode>(polish_expr_.at(opd).node));
-        RotateLeft_(
-            std::dynamic_pointer_cast<CutNode>(polish_expr_.at(opd).node));
-        prev_move_ = MoveRecord_{Move::kOperandAndOperatorSwap, {opd, opr}};
-      } else {
-        // Don't have to restore because no move is actually made.
-        Perturb();
-        break;
-      }
+      // Notice that we're swapping the operator to the right, which never
+      // breaks the property.
+      std::swap(polish_expr_.at(opd), polish_expr_.at(opr));
+      number_of_operators_in_subexpression_.at(opr)
+          -= 1;  // where the operator was is no longer an operator
+      // Update the tree.
+      // Note the nodes have been swapped. opd is now the operator.
+      auto opr_node
+          = std::dynamic_pointer_cast<CutNode>(polish_expr_.at(opd).node);
+      assert(opr_node);
+      RotateRight_(
+          std::dynamic_pointer_cast<CutNode>(polish_expr_.at(opd).node));
+      prev_move_ = MoveRecord_{Move::kOperandAndOperatorSwap, {opd, opr}};
     } break;
     default:
       assert(false && "unknown kind of move");
@@ -217,9 +209,9 @@ void SlicingTree::SwapBlockNode_(std::shared_ptr<BlockNode> a,
   }
 }
 
-/// @details Swapping with the operator is equivalent to rotate the operator to
-/// the left. Notice that the operand is always the right child of the operator.
-/// For example, to swap b3 with H:
+/// @details Reversing the swap is equivalent to rotate the operator to the
+/// left. Notice that the operand is always the right child of the operator. For
+/// example, to swap b3 with H:
 /// b1 b2 b3 H H b4 H -> b1 b2 H b3 H b4 H
 ///      H                H     //
 ///     / \              / \    //
@@ -256,8 +248,10 @@ void SlicingTree::RotateLeft_(std::shared_ptr<CutNode> opr) {
   }
 }
 
-/// @details
-/// b1 b2 b3 H H b4 H -> b1 b2 H b3 H b4 H
+/// @details Swapping with the operator is equivalent to rotate the operator to
+/// the right. Notice that the operand is always the right sibling of the
+/// operator. For example, to swap b3 with H: b1 b2 H b3 H b4 H -> b1 b2 b3 H H
+/// b4 H
 ///        H            H        //
 ///       / \          / \       //
 ///      H  b4        H   b4     //
@@ -342,11 +336,11 @@ void SlicingTree::Restore() {
       }
     } break;
     case Move::kOperandAndOperatorSwap: {
-      auto [opr, opd] = prev_move_->index_of_nodes;
-      std::swap(polish_expr_.at(opr), polish_expr_.at(opd));
+      auto [opd, opr] = prev_move_->index_of_nodes;
+      std::swap(polish_expr_.at(opd), polish_expr_.at(opr));
       number_of_operators_in_subexpression_.at(opr)
-          -= 1;  // opr is now the operand
-      RotateRight_(
+          += 1;  // where the operator was is now again the operator
+      RotateLeft_(
           std::dynamic_pointer_cast<CutNode>(polish_expr_.at(opr).node));
     } break;
     default:
