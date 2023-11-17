@@ -4,8 +4,7 @@
 #include <iostream>
 #include <memory>  // shared_ptr
 #include <optional>
-#include <random>  // mt19937, random_device
-#include <unordered_map>
+#include <random>   // mt19937, random_device
 #include <utility>  // pair
 #include <variant>
 #include <vector>
@@ -100,7 +99,7 @@ class SlicingTree {
   void BuildTreeFromPolishExpr_();
 
   /// @brief Updates the tree for operand/operand swaps.
-  void SwapTreeNode_(std::shared_ptr<TreeNode>, std::shared_ptr<TreeNode>);
+  void SwapBlockNode_(std::shared_ptr<BlockNode>, std::shared_ptr<BlockNode>);
 
   /// @brief Updates the tree for operand/operator swaps.
   /// @param opr The operator (cut node) to swap with.

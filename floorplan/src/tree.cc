@@ -126,7 +126,9 @@ void SlicingTree::Perturb() {
         opd = SelectOperandIndex_();
       }
       std::swap(polish_expr_.at(opd), polish_expr_.at(opd + 1));
-      SwapTreeNode_(polish_expr_.at(opd).node, polish_expr_.at(opd + 1).node);
+      SwapBlockNode_(
+          std::dynamic_pointer_cast<BlockNode>(polish_expr_.at(opd).node),
+          std::dynamic_pointer_cast<BlockNode>(polish_expr_.at(opd + 1).node));
       prev_move_ = MoveRecord_{Move::kOperandSwap, {opd, opd + 1}};
     } break;
     case Move::kChainInvert: {
@@ -194,8 +196,8 @@ void SlicingTree::Perturb() {
   }
 }
 
-void SlicingTree::SwapTreeNode_(std::shared_ptr<TreeNode> a,
-                                std::shared_ptr<TreeNode> b) {
+void SlicingTree::SwapBlockNode_(std::shared_ptr<BlockNode> a,
+                                 std::shared_ptr<BlockNode> b) {
   auto a_parent = a->parent.lock();
   auto b_parent = b->parent.lock();
   if (a_parent->left == a) {
@@ -319,7 +321,9 @@ void SlicingTree::Restore() {
       auto [opd_1, opd_2] = prev_move_->index_of_nodes;
       assert(opd_2 == opd_1 + 1);
       std::swap(polish_expr_.at(opd_1), polish_expr_.at(opd_2));
-      SwapTreeNode_(polish_expr_.at(opd_1).node, polish_expr_.at(opd_2).node);
+      SwapBlockNode_(
+          std::dynamic_pointer_cast<BlockNode>(polish_expr_.at(opd_1).node),
+          std::dynamic_pointer_cast<BlockNode>(polish_expr_.at(opd_2).node));
     } break;
     case Move::kChainInvert: {
       auto [li, ui] = prev_move_->index_of_nodes;
