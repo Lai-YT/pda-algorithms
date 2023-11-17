@@ -212,183 +212,143 @@ void SlicingTree::SwapBlockNode_(std::shared_ptr<BlockNode> a,
 
 void SlicingTree::SwapBlockNodeWithCutNode_(std::shared_ptr<BlockNode> opd,
                                             std::shared_ptr<CutNode> opr) {
-  // Notice that there are 2 possible cases:
-  // TODO: case (1) is a special case of case (2), possible to be handled
-  // together
+  // There are 2 possible cases:
+  // (1) The operand is the right sibling of the operator
+  // For example, to swap b3 with H:
+  // b1 b2 H b3 H b4 H -> b1 b2 b3 H H b4 H
+  //        H              H            //
+  //       / \            / \           //
+  //      H  b4          H   b4         //
+  //     / \       ->   / \             //
+  //   [H] [b3]        b1  [H]          //
+  //   / \                 / \          //
+  //  b1  b2              b2 [b3]       //
+  // (2) The operand is the left-most child of the right sibling of the
+  // operator. For example to swap b3 with H:
+  // b1 b2 H b3 b4 V H b5 H -> b1 b2 b3 H b4 V H b5 H
+  //                            H       //
+  //                           /  \     //
+  //          H               H     b5  //
+  //        /   \            / \        //
+  //       H    b5         b1   v       //
+  //     /   \      ->         /  \     //
+  //   [H]     V             [H]  b4    //
+  //   / \    /  \           / \        //
+  //  b1  b2 [b3] b4        b2 [b3]     //
+  // Notice that case (1) is a special case of case (2) where the parent of the
+  // operand is the same as the parent of the operator, allowing unified
+  // handling.
+  //
   auto parent = opr->parent.lock();
-  if (std::dynamic_pointer_cast<BlockNode>(parent->right)) {
-    // (1) The operand is the right sibling of the operator
-    // For example, to swap b3 with H:
-    // b1 b2 H b3 H b4 H -> b1 b2 b3 H H b4 H
-    //        H              H            //
-    //       / \            / \           //
-    //      H  b4          H   b4         //
-    //     / \       ->   / \             //
-    //   [H] [b3]        b1  [H]          //
-    //   / \                 / \          //
-    //  b1  b2              b2 [b3]       //
-    assert(opd == parent->right);
+  auto parent_of_opd = opd->parent.lock();
+  parent->left = opr->left;
+  opr->left->parent = parent;
+  //          H                     //
+  //        /   \                   //
+  // (par) H    b5      (opr) [H]   //
+  //     /   \                  \   //
+  //    b1    V  (par_opd)      b2  //
+  //         /  \                   //
+  // (opd) [b3]  b4                 //
 
-    parent->left = opr->left;
-    opr->left->parent = parent;
-    //         H                  //
-    //        / \                 //
-    // (par) H  b4      [H] (opr) //
-    //      / \           \       //
-    //     b1 [b3] (opr)   b2     //
+  opr->left = opr->right;
+  opr->right = opd;
+  opd->parent = opr;
+  //          H                       //
+  //        /   \                     //
+  // (par) H    b5      (opr) [H]     //
+  //     /   \                /  \    //
+  //    b1    V  (par_opd)   b2  [b3] //
+  //           \                      //
+  //            b4                    //
 
-    opr->left = opr->right;
-    opr->right = parent->right;
-    opr->right->parent = opr;
-    //         H             //
-    //        / \            //
-    //       H  b4    [H]    //
-    //      /         / \    //
-    //     b1        b2 [b3] //
-
-    parent->right = opr;
-    // Note that the parent of opr doesn't change.
-
-    for (auto parent = opr; parent; parent = parent->parent.lock()) {
-      parent->Update();
-    }
+  if (parent_of_opd == parent) {
+    // case (1)
+    parent_of_opd->right = opr;
   } else {
-    // (2) The operand is the left-most child of the right sibling of the
-    // operator. For example to swap b3 with H: b1 b2 H b3 b4 V H b5 H -> b1 b2
-    // b3 H b4 V H b5 H
-    //                            H       //
-    //                           /  \     //
-    //          H               H     b5  //
-    //        /   \            / \        //
-    //       H    b5         b1   v       //
-    //     /   \      ->         /  \     //
-    //   [H]     V             [H]  b4    //
-    //   / \    /  \           / \        //
-    //  b1  b2 [b3] b4        b2 [b3]     //
-
-    auto parent_of_opd = opd->parent.lock();
-    parent->left = opr->left;
-    opr->left->parent = parent;
-    //          H                     //
-    //        /   \                   //
-    // (par) H    b5      (opr) [H]   //
-    //     /   \                  \   //
-    //    b1    V  (par_opd)      b2  //
-    //         /  \                   //
-    // (opd) [b3]  b4                 //
-
-    opr->left = opr->right;
-    opr->right = opd;
-    opd->parent = opr;
-    //          H                       //
-    //        /   \                     //
-    // (par) H    b5      (opr) [H]     //
-    //     /   \                /  \    //
-    //    b1    V  (par_opd)   b2  [b3] //
-    //           \                      //
-    //            b4                    //
-
+    // case (2)
     parent_of_opd->left = opr;
-    opr->parent = parent_of_opd;
-
-    do {  // all the way up to the root
-      opr->Update();
-      opr = opr->parent.lock();
-    } while (opr);
   }
+  opr->parent = parent_of_opd;
+
+  do {  // all the way up to the root
+    opr->Update();
+    opr = opr->parent.lock();
+  } while (opr);
 }
 
 void SlicingTree::ReverseBlockNodeWithCutNode_(std::shared_ptr<BlockNode> opd,
                                                std::shared_ptr<CutNode> opr) {
-  // Notice that there are 2 possible cases:
+  // There are 2 possible cases:
+  // (1) The operator is the right child of its parent
+  // For example, to swap b3 with H:
+  // b1 b2 b3 H H b4 H -> b1 b2 H b3 H b4 H
+  //      H                H     //
+  //     / \              / \    //
+  //    H   b4           H  b4   //
+  //   / \       ->     / \      //
+  // b1  [H]          [H] [b3]   //
+  //     / \          / \        //
+  //    b2 [b3]      b1  b2      //
+  // (2) The operator is the left-most inner node of a subtree. It should be
+  // swapped to become the left child of the parent of the subtree to which it
+  // belonged. For example, to swap b3 with H: b1 b2 b3 H b4 V H b5 H -> b1 b2
+  // H b3 b4 V H b5 H
+  //           H                       //
+  //         /  \                      //
+  //        H     b5            H      //
+  //       / \                /   \    //
+  //     b1   v              H    b5   //
+  //         /  \    ->    /   \       //
+  //       [H]  b4       [H]     V     //
+  //       / \           / \    /  \   //
+  //     b2 [b3]        b1  b2 [b3] b4 //
+  // Notice that case (1) is a special case of case (2) where the operator is
+  // the right child of its parent, , allowing unified handling.
+  //
   auto parent = opr->parent.lock();
-  assert(opd == opr->right);
   if (parent->right == opr) {
-    // (1) The operator is the right child of its parent
-    // For example, to swap b3 with H:
-    // b1 b2 b3 H H b4 H -> b1 b2 H b3 H b4 H
-    //      H                H     //
-    //     / \              / \    //
-    //    H   b4           H  b4   //
-    //   / \       ->     / \      //
-    // b1  [H]          [H] [b3]   //
-    //     / \          / \        //
-    //    b2 [b3]      b1  b2      //
-
+    // case (1)
     parent->right = opd;
-    opd->parent = parent;
-    //         H                       //
-    //        / \                      //
-    // (par) H   b4         [H] (opr)  //
-    //      / \             /          //
-    //     b1  [b3] (opd)  b2          //
-
-    opr->right = opr->left;
-    opr->left = parent->left;
-    opr->left->parent = opr;
-    //      H            //
-    //     / \           //
-    //    H   b4   [H]   //
-    //     \       / \   //
-    //    [b3]   b1  b2  //
-
-    parent->left = opr;
-    // Note that the parent of opr doesn't change.
-
-    for (auto parent = opr; parent; parent = parent->parent.lock()) {
-      parent->Update();
-    }
   } else {
-    // (2) The operator is the left-most inner node of a subtree. It should be
-    // swapped to become the left child of the parent of the subtree to which it
-    // belonged. For example, to swap b3 with H: b1 b2 b3 H b4 V H b5 H -> b1 b2
-    // H b3 b4 V H b5 H
-    //           H                       //
-    //         /  \                      //
-    //        H     b5            H      //
-    //       / \                /   \    //
-    //     b1   v (par)        H    b5   //
-    //         /  \    ->    /   \       //
-    // (opr) [H]  b4       [H]     V     //
-    //       / \           / \    /  \   //
-    //     b2 [b3]        b1  b2 [b3] b4 //
-
+    // case (2)
     parent->left = opd;
-    opd->parent = parent;
-    //           H             //
-    //         /  \            //
-    //        H     b5         //
-    //       / \               //
-    //     b1   v         [H]  //
-    //         /  \       /    //
-    //       [b3]  b4    b2    //
+  }
+  parent->left = opd;
+  opd->parent = parent;
+  //           H             //
+  //         /  \            //
+  //        H     b5         //
+  //       / \               //
+  //     b1   v (par)   [H]  //
+  //         /  \       /    //
+  //       [b3]  b4    b2    //
 
-    opr->right = opr->left;
-    auto root_of_subtree = parent;
-    while (root_of_subtree != root_of_subtree->parent.lock()->right) {
-      root_of_subtree = root_of_subtree->parent.lock();
-    }
-    auto parent_of_subtree = root_of_subtree->parent.lock();
-    opr->left = parent_of_subtree->left;
-    opr->left->parent = opr;
-    //           H              //
-    //         /  \             //
-    //        H     b5          //
-    //         \                //
-    //          v         [H]   //
-    //         /  \      /   \  //
-    //       [b3]  b4   b1   b2 //
+  opr->right = opr->left;
+  auto root_of_subtree = parent;
+  while (root_of_subtree != root_of_subtree->parent.lock()->right) {
+    root_of_subtree = root_of_subtree->parent.lock();
+  }
+  auto parent_of_subtree = root_of_subtree->parent.lock();
+  opr->left = parent_of_subtree->left;
+  opr->left->parent = opr;
+  //           H              //
+  //         /  \             //
+  //        H     b5          //
+  //         \                //
+  //          v         [H]   //
+  //         /  \      /   \  //
+  //       [b3]  b4   b1   b2 //
 
-    parent_of_subtree->left = opr;
-    opr->parent = parent_of_subtree;
+  parent_of_subtree->left = opr;
+  opr->parent = parent_of_subtree;
 
-    // parent_of_subtree is the least common ancestor, and opr is the direct
-    // child of it
-    opr->Update();
-    for (auto ancestor_of_opd = opd->parent.lock(); ancestor_of_opd;
-         ancestor_of_opd = ancestor_of_opd->parent.lock()) {
-      ancestor_of_opd->Update();
-    }
+  // parent_of_subtree is the least common ancestor, and opr is the direct
+  // child of it
+  opr->Update();
+  for (auto ancestor_of_opd = opd->parent.lock(); ancestor_of_opd;
+       ancestor_of_opd = ancestor_of_opd->parent.lock()) {
+    ancestor_of_opd->Update();
   }
 }
 
