@@ -61,7 +61,6 @@ SlicingTree::SlicingTree(const std::vector<Block>& blocks) {
 
 void SlicingTree::InitFloorplanPolishExpr_() {
   // Initial State: we start with the Polish expression 01V2V3V... nV
-  // TODO: select the type of the cuts randomly
   polish_expr_.emplace_back(BlockOrCut{blocks_.at(0)});
   number_of_operators_in_subexpression_.push_back(0);
   for (auto itr = std::next(blocks_.begin()), end = blocks_.end(); itr != end;
@@ -69,8 +68,9 @@ void SlicingTree::InitFloorplanPolishExpr_() {
     polish_expr_.emplace_back(BlockOrCut{*itr});
     number_of_operators_in_subexpression_.push_back(
         number_of_operators_in_subexpression_.back());
-
-    polish_expr_.emplace_back(BlockOrCut{Cut::kV});
+    polish_expr_.emplace_back(BlockOrCut{
+        std::uniform_int_distribution<>{0, 1}(twister_) == 0 ? Cut::kV
+                                                             : Cut::kH});
     number_of_operators_in_subexpression_.push_back(
         number_of_operators_in_subexpression_.back() + 1);
   }
