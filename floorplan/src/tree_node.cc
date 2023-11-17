@@ -1,6 +1,7 @@
 #include "tree_node.h"
 
 #include <algorithm>
+#include <iostream>
 
 #include "cut.h"
 
@@ -26,4 +27,18 @@ void CutNode::UpdateHeight() {
 
 void CutNode::InvertCut() {
   cut_ = (cut_ == Cut::kH ? Cut::kV : Cut::kH);
+
+void CutNode::Dump(std::ostream& out) const {
+  // Postorder traversal.
+  if (left) {
+    left->Dump(out);
+  }
+  if (right) {
+    right->Dump(out);
+  }
+  out << (cut_ == Cut::kH ? 'H' : 'V') << ' ';
+}
+
+void BlockNode::Dump(std::ostream& out) const {
+  out << block_->name << ' ';
 }

@@ -1,6 +1,7 @@
 #ifndef FLOORPLAN_TREE_NODE_H_
 #define FLOORPLAN_TREE_NODE_H_
 
+#include <iosfwd>
 #include <memory>
 
 #include "cut.h"
@@ -24,6 +25,8 @@ class TreeNode {
   unsigned Height() const {
     return height_;
   }
+
+  virtual void Dump(std::ostream& out) const = 0;
 
   TreeNode(std::shared_ptr<TreeNode> left, std::shared_ptr<TreeNode> right)
       : left{left}, right{right} {}
@@ -49,6 +52,8 @@ class CutNode : public TreeNode {
 
   void InvertCut();
 
+  void Dump(std::ostream& out) const override;
+
   CutNode(Cut cut, std::shared_ptr<TreeNode> left,
           std::shared_ptr<TreeNode> right)
       : TreeNode{left, right}, cut_{cut} {
@@ -62,6 +67,8 @@ class CutNode : public TreeNode {
 
 class BlockNode : public TreeNode {
  public:
+  void Dump(std::ostream& out) const override;
+
   BlockNode(ConstSharedBlockPtr block)
       : TreeNode{nullptr, nullptr}, block_{block} {
     width_ = block->width;

@@ -346,6 +346,7 @@ void SlicingTree::Restore() {
 }
 
 void SlicingTree::Dump(std::ostream& out) const {
+  out << "expr: ";
   for (const auto& block_or_cut : polish_expr_) {
     if (block_or_cut.IsBlock()) {
       out << block_or_cut.GetBlock()->name;
@@ -354,5 +355,9 @@ void SlicingTree::Dump(std::ostream& out) const {
     }
     out << ' ';
   }
+  out << '\n';
+
+  out << "tree: ";
+  root_->Dump(out);
   out << '\n';
 }
