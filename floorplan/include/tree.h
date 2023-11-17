@@ -102,12 +102,13 @@ class SlicingTree {
   void SwapBlockNode_(std::shared_ptr<BlockNode>, std::shared_ptr<BlockNode>);
 
   /// @brief Updates the tree for operand/operator swaps.
-  /// @param opr The operator (cut node) to swap with.
-  void RotateRight_(std::shared_ptr<CutNode> opr);
+  void SwapBlockNodeWithCutNode_(std::shared_ptr<BlockNode> opd,
+                                 std::shared_ptr<CutNode> opr);
 
-  /// @brief The reverse operation of rotate right. Particularly for the
-  /// restoration.
-  void RotateLeft_(std::shared_ptr<CutNode> opr);
+  /// @brief The reverse operation of the swap between operand and operator.
+  /// Particularly for the restoration.
+  void ReverseBlockNodeWithCutNode_(std::shared_ptr<BlockNode> opd,
+                                    std::shared_ptr<CutNode> opr);
 
   std::mt19937 twister_{std::random_device{}()};
 
