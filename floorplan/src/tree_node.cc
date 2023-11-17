@@ -28,6 +28,17 @@ void CutNode::UpdateHeight() {
 void CutNode::InvertCut() {
   cut_ = (cut_ == Cut::kH ? Cut::kV : Cut::kH);
 
+  UpdateWidth();
+  UpdateHeight();
+  // TODO: Chained cut nodes are usually inverted together. In such cases, the
+  // ancestors are updated multiple time
+  for (auto parent_ = parent.lock(); parent_;
+       parent_ = parent_->parent.lock()) {
+    parent_->UpdateWidth();
+    parent_->UpdateHeight();
+  }
+}
+
 void CutNode::Dump(std::ostream& out) const {
   // Postorder traversal.
   if (left) {

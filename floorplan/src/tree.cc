@@ -106,7 +106,6 @@ void SlicingTree::BuildTreeFromPolishExpr_() {
   root_ = root;
 }
 
-// TODO: update width and height after the move.
 void SlicingTree::Perturb() {
   // 1. select one of the three moves
   // 2. select the operand/operator to perform the move
@@ -213,6 +212,16 @@ void SlicingTree::SwapBlockNode_(std::shared_ptr<BlockNode> a,
     b_parent->right = a;
   }
   a->parent = b_parent;
+
+  // TODO: not to update common ancestors twice.
+  for (auto parent = a->parent.lock(); parent; parent = parent->parent.lock()) {
+    parent->UpdateWidth();
+    parent->UpdateHeight();
+  }
+  for (auto parent = b->parent.lock(); parent; parent = parent->parent.lock()) {
+    parent->UpdateWidth();
+    parent->UpdateHeight();
+  }
 }
 
 /// @details Swapping with the operator is equivalent to rotate the operator to
@@ -248,6 +257,11 @@ void SlicingTree::RotateLeft_(std::shared_ptr<CutNode> opr) {
 
   parent->left = opr;
   // Note that the parent of opr doesn't change.
+
+  for (auto parent = opr; parent; parent = parent->parent.lock()) {
+    parent->UpdateWidth();
+    parent->UpdateHeight();
+  }
 }
 
 /// @details
@@ -281,6 +295,11 @@ void SlicingTree::RotateRight_(std::shared_ptr<CutNode> opr) {
 
   parent->right = opr;
   // Note that the parent of opr doesn't change.
+
+  for (auto parent = opr; parent; parent = parent->parent.lock()) {
+    parent->UpdateWidth();
+    parent->UpdateHeight();
+  }
 }
 
 unsigned SlicingTree::GetArea() const {
