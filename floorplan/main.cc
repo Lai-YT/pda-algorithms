@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
 
+#include "annealing.h"
 #include "parser.h"
 #include "tree.h"
 
@@ -15,6 +16,7 @@ int main(int argc, char const* argv[]) {
   auto parser = Parser{in};
   parser.Parse();
   auto input = parser.GetInput();
+#ifdef DEBUG
   std::cout << "Dump input:\n";
   std::cout << input.aspect_ratio.lower_bound << ' '
             << input.aspect_ratio.upper_bound << '\n';
@@ -22,14 +24,16 @@ int main(int argc, char const* argv[]) {
     std::cout << block.name << ' ' << block.width << ' ' << block.height
               << '\n';
   }
+#endif
   auto tree = SlicingTree{input.blocks};
+#ifdef DEBUG
   std::cout << "Dump polish expression:\n";
   tree.Dump();
-  for (auto i = 0; i < 10; i++) {
-    std::cout << "--- " << i << " ---\n";
-    tree.Perturb();
-    tree.Dump();
-    std::cout << "\tarea = " << tree.GetArea() << '\n';
-  }
+#endif
+  auto area
+      = SimulateAnnealing(tree, input.aspect_ratio, 0.85, input.blocks.size());
+  std::cout << area << " area\n";
+  std::cout << tree.Width() / static_cast<double>(tree.Height())
+            << " aspect ratio\n";
   return 0;
 }
