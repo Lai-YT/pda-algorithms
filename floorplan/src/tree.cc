@@ -119,6 +119,7 @@ void SlicingTree::Perturb() {
       // an block, select another block.
       // TODO: it may be hard to find a pair of adjacent blocks. Use a data
       // structure to record the pairs.
+      // TODO: two blocks separated by only cuts are also considered as adjacent
       while (block + 1 == polish_expr_.size()
              || !polish_expr_.at(block + 1).IsBlock()) {
         block = SelectIndexOfBlock_();
@@ -301,6 +302,11 @@ void SlicingTree::ReverseBlockNodeWithCutNode_(std::shared_ptr<BlockNode> block,
   // the right child of its parent, , allowing unified handling.
   //
   auto parent = cut->parent.lock();
+  auto root_of_subtree = cut;
+  while (root_of_subtree != root_of_subtree->parent.lock()->right) {
+    root_of_subtree = root_of_subtree->parent.lock();
+  }
+
   if (parent->right == cut) {
     // case (1)
     parent->right = block;
@@ -308,7 +314,6 @@ void SlicingTree::ReverseBlockNodeWithCutNode_(std::shared_ptr<BlockNode> block,
     // case (2)
     parent->left = block;
   }
-  parent->left = block;
   block->parent = parent;
   //               H                     //
   //              /  \                   //
@@ -319,10 +324,6 @@ void SlicingTree::ReverseBlockNodeWithCutNode_(std::shared_ptr<BlockNode> block,
   //             [b3]  b4          b2    //
 
   cut->right = cut->left;
-  auto root_of_subtree = parent;
-  while (root_of_subtree != root_of_subtree->parent.lock()->right) {
-    root_of_subtree = root_of_subtree->parent.lock();
-  }
   auto parent_of_subtree = root_of_subtree->parent.lock();
   cut->left = parent_of_subtree->left;
   cut->left->parent = cut;
