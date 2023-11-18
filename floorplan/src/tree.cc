@@ -371,8 +371,12 @@ void SlicingTree::UpdatePairsFormedByNeighbors_(std::size_t cut,
   }
 }
 
-unsigned SlicingTree::GetArea() const {
-  return root_->Width() * root_->Height();
+unsigned SlicingTree::Width() const {
+  return root_->Width();
+}
+
+unsigned SlicingTree::Height() const {
+  return root_->Height();
 }
 
 std::size_t SlicingTree::SelectIndexOfBlock_() {

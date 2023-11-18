@@ -61,7 +61,8 @@ class SlicingTree {
   /// @note Only the latest previous  perturbation can be restored.
   void Restore();
 
-  unsigned GetArea() const;
+  unsigned Width() const;
+  unsigned Height() const;
 
   void Dump(std::ostream& out = std::cout) const;
 
