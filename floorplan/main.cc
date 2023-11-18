@@ -2,13 +2,15 @@
 #include <iostream>
 
 #include "annealing.h"
+#include "arg.h"
 #include "parser.h"
 #include "tree.h"
 
 using namespace floorplan;
 
-int main(int argc, char const* argv[]) {
-  auto in = std::fstream{argv[1]};
+int main(int argc, char* argv[]) {
+  auto arg = HandleArguments(argc, argv);
+  auto in = std::fstream{arg.in};
   if (!in) {
     std::perror(argv[1]);
     return 1;
