@@ -62,12 +62,15 @@ SlicingTree::SlicingTree(const std::vector<Block>& blocks) {
 void SlicingTree::InitFloorplanPolishExpr_() {
   // Initial State: we start with the Polish expression 01V2V3V... nV
   polish_expr_.emplace_back(BlockOrCut{blocks_.at(0)});
-  for (auto itr = std::next(blocks_.begin()), end = blocks_.end(); itr != end;
-       ++itr) {
-    polish_expr_.emplace_back(BlockOrCut{*itr});
+  for (auto i = std::size_t{1}; i < blocks_.size(); i++) {
+    polish_expr_.emplace_back(BlockOrCut{blocks_.at(i)});
     polish_expr_.emplace_back(BlockOrCut{
         std::uniform_int_distribution<>{0, 1}(twister_) == 0 ? Cut::kV
                                                              : Cut::kH});
+    // The last cut at the rightmost of the expression has not such pair.
+    if (i != blocks_.size() - 1) {
+      cut_and_block_pair_.push_back(i * 2);
+    }
   }
   assert(polish_expr_.size() == 2 * blocks_.size() - 1);
 }
@@ -104,7 +107,9 @@ void SlicingTree::Perturb() {
   // 1. select one of the three moves
   // 2. select the block/cut to perform the move
   // 3. record this move for possible restoration
-  switch (std::uniform_int_distribution<>{1, 3}(twister_)) {
+  bool can_perform_block_and_cut_swap = !cut_and_block_pair_.empty();
+  switch (std::uniform_int_distribution<>{
+      1, (can_perform_block_and_cut_swap ? 3 : 2)}(twister_)) {
     case Move::kBlockSwap: {
       // Swap 2 adjacent blocks.
       // The balloting property always hold after the move. No checking is
@@ -147,17 +152,10 @@ void SlicingTree::Perturb() {
       prev_move_ = MoveRecord_{Move::kChainInvert, {li, ui}};
     } break;
     case Move::kBlockAndCutSwap: {
-      // Swap a pair of adjacent block and cut
-      auto block = SelectIndexOfBlock_();
-      // We always choose block - 1 as the adjacent cut. If block - 1 is not a
-      // cut, select another block.
-      // FIXME: Infinite loop occurs when all blocks are on the left side
-      // and cuts are on the right side of the expression. No block can be
-      // selected in this configuration.
-      while (block == 0 || !polish_expr_.at(block - 1).IsCut()) {
-        block = SelectIndexOfBlock_();
-      }
-      auto cut = block - 1;
+      auto pair_idx = static_cast<std::size_t>(std::uniform_int_distribution<>{
+          0, cut_and_block_pair_.size() - 1}(twister_));
+      auto cut = cut_and_block_pair_.at(pair_idx);
+      auto block = cut + 1;
       // The balloting property must hold after the move.
       // Notice that we're swapping the cut to the right, which never
       // breaks the property.
@@ -171,6 +169,8 @@ void SlicingTree::Perturb() {
           std::dynamic_pointer_cast<BlockNode>(polish_expr_.at(cut).node),
           std::dynamic_pointer_cast<CutNode>(polish_expr_.at(block).node));
       prev_move_ = MoveRecord_{Move::kBlockAndCutSwap, {block, cut}};
+      // Only swapping block with cut changes the pair of cut and block.
+      UpdatePairsFormedByNeighbors_(block, pair_idx);
     } break;
     default:
       assert(false && "unknown kind of move");
@@ -346,6 +346,30 @@ void SlicingTree::ReverseBlockNodeWithCutNode_(std::shared_ptr<BlockNode> block,
   }
 }
 
+void SlicingTree::UpdatePairsFormedByNeighbors_(std::size_t cut,
+                                                std::size_t index_of_pair) {
+  auto block = cut - 1;
+  // There are 4 cases, the cb in the middle of the left hand side is
+  // swapped by the current move, a pair of parenthesis indicates a pair of
+  // cut and block:
+  // (1) b(cb)b => bb(cb)  : 1 => 1
+  // (2) b(cb)c => bbcc    : 1 => 0
+  // (3) c(cb)c => (cb)cc  : 1 => 1
+  // (4) c(cb)b => (cb)(cb): 1 => 2
+
+  // Remove the select pair.
+  auto pair_itr = std::next(cut_and_block_pair_.begin(), index_of_pair);
+  cut_and_block_pair_.erase(pair_itr);
+
+  // Add new pairs formed by the neighbors.
+  if (block > 0 && polish_expr_.at(block - 1).IsCut()) {
+    cut_and_block_pair_.push_back(block - 1 /* index of cut*/);
+  }
+  if (cut < polish_expr_.size() - 1 && polish_expr_.at(cut + 1).IsBlock()) {
+    cut_and_block_pair_.push_back(cut);
+  }
+}
+
 unsigned SlicingTree::GetArea() const {
   return root_->Width() * root_->Height();
 }
@@ -398,12 +422,41 @@ void SlicingTree::Restore() {
       ReverseBlockNodeWithCutNode_(
           std::dynamic_pointer_cast<BlockNode>(polish_expr_.at(block).node),
           std::dynamic_pointer_cast<CutNode>(polish_expr_.at(cut).node));
+      RestoredPairsFormedByNeighbors_(cut);
     } break;
     default:
       assert(false && "unknown kind of move");
   }
   // Clears the record.
   prev_move_.reset();
+}
+
+void SlicingTree::RestoredPairsFormedByNeighbors_(std::size_t cut) {
+  auto block = cut + 1;
+  // Consider the 4 cases of the changes of the pairs after the reverse
+  // move, the bc in the middle of the left hand side is swapped by the
+  // reversed move:
+  // (1) bb(cb)   => b(cb)b: 1 => 1
+  // (2) bbcc     => b(cb)c: 0 => 1
+  // (3) (cb)cc   => c(cb)c: 1 => 1
+  // (4) (cb)(cb) => c(cb)b: 2 => 1
+  // Note that this function is called after the reverse move. Cut was block,
+  // vice versa.
+  if (polish_expr_.at(block + 1).IsBlock()) {
+    // This pair is removed.
+    // TODO: linear search may be slow
+    auto pair_itr = std::find(cut_and_block_pair_.begin(),
+                              cut_and_block_pair_.end(), block);
+    cut_and_block_pair_.erase(pair_itr);
+  }
+  if (polish_expr_.at(cut - 1).IsCut()) {
+    // This pair is removed.
+    auto pair_itr = std::find(cut_and_block_pair_.begin(),
+                              cut_and_block_pair_.end(), cut - 1);
+    cut_and_block_pair_.erase(pair_itr);
+  }
+  // A pair is formed again by c and b.
+  cut_and_block_pair_.push_back(cut);
 }
 
 void SlicingTree::Dump(std::ostream& out) const {

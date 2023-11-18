@@ -90,6 +90,25 @@ class SlicingTree {
   /// @brief A tree structure is used to update the area quickly.
   std::shared_ptr<TreeNode> root_{};
 
+  /// @brief Indices of cuts in cut and block pairs. This information is
+  /// particularly for the block/cut swap.
+  /// @note Block index is implicitly cut index + 1.
+  std::vector<std::size_t> cut_and_block_pair_;
+
+  /// @brief Removes the original cut and block pair formed by the cut and adds
+  /// new cut and block pairs formed by its neighbors.
+  /// @param cut Index of the cut in the expression.
+  /// @param index_of_pair Index of the original cut and block pair.
+  /// @note This function is called after a block/cut swap. The block index is
+  /// implicitly (cut index - 1).
+  void UpdatePairsFormedByNeighbors_(std::size_t cut,
+                                     std::size_t index_of_pair);
+  /// @brief Restores cut and block pairs formed by the neighbors.
+  /// @param cut Index of the cut in the expression.
+  /// @note This function is called after a block/cut reversed swap. The block
+  /// index is implicitly (cut index + 1).
+  void RestoredPairsFormedByNeighbors_(std::size_t cut);
+
   void InitFloorplanPolishExpr_();
   /// @brief Builds the entire tree with respect to the polish expression and
   /// sets up the mapping.
