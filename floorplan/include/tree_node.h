@@ -17,14 +17,10 @@ class TreeNode {
  public:
   /// @brief The padded width of the entire subtree. For blocks, which are leaf
   /// nodes, it's equal to the width of the block.
-  unsigned Width() const {
-    return width_;
-  }
+  virtual unsigned Width() const = 0;
   /// @brief The padded height of the entire subtree. For blocks, which are leaf
   /// nodes, it's equal to the height of the block.
-  unsigned Height() const {
-    return height_;
-  }
+  virtual unsigned Height() const = 0;
 
   virtual void Dump(std::ostream& out) const = 0;
 
@@ -36,10 +32,6 @@ class TreeNode {
   std::weak_ptr<CutNode> parent{};
   std::shared_ptr<TreeNode> left;
   std::shared_ptr<TreeNode> right;
-
- protected:
-  unsigned width_;
-  unsigned height_;
 };
 
 class CutNode : public TreeNode {
@@ -51,6 +43,14 @@ class CutNode : public TreeNode {
 
   void InvertCut();
 
+  unsigned Width() const override {
+    return width_;
+  }
+
+  unsigned Height() const override {
+    return height_;
+  }
+
   void Dump(std::ostream& out) const override;
 
   CutNode(Cut cut, std::shared_ptr<TreeNode> left,
@@ -61,6 +61,8 @@ class CutNode : public TreeNode {
 
  private:
   Cut cut_;
+  unsigned width_;
+  unsigned height_;
 
   void UpdateWidth_();
   void UpdateHeight_();
@@ -68,13 +70,18 @@ class CutNode : public TreeNode {
 
 class BlockNode : public TreeNode {
  public:
+  unsigned Width() const override {
+    return block_->width;
+  }
+
+  unsigned Height() const override {
+    return block_->height;
+  }
+
   void Dump(std::ostream& out) const override;
 
   BlockNode(ConstSharedBlockPtr block)
-      : TreeNode{nullptr, nullptr}, block_{block} {
-    width_ = block->width;
-    height_ = block->height;
-  }
+      : TreeNode{nullptr, nullptr}, block_{block} {}
 
  private:
   ConstSharedBlockPtr block_;
