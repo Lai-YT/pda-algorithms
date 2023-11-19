@@ -153,8 +153,9 @@ void SlicingTree::Perturb() {
       prev_move_ = MoveRecord_{Move::kChainInvert, {li, ui}};
     } break;
     case Move::kBlockAndCutSwap: {
+      assert(!cut_and_block_pair_.empty());
       auto pair_idx = static_cast<std::size_t>(std::uniform_int_distribution<>{
-          0, cut_and_block_pair_.size() - 1}(twister_));
+          0, static_cast<int>(cut_and_block_pair_.size() - 1)}(twister_));
       auto cut = cut_and_block_pair_.at(pair_idx);
       auto block = cut + 1;
       // The balloting property must hold after the move.
@@ -384,8 +385,8 @@ std::size_t SlicingTree::SelectIndexOfBlock_() {
       = BlockOrCut{Cut::kH};       // a dummy initial value that's not a block
   auto expr_idx = std::size_t{0};  // a dummy initial value
   while (!block_or_cut.IsBlock()) {
-    expr_idx
-        = std::uniform_int_distribution<>{0, polish_expr_.size() - 1}(twister_);
+    expr_idx = std::uniform_int_distribution<>{
+        0, static_cast<int>(polish_expr_.size() - 1)}(twister_);
     block_or_cut = polish_expr_.at(expr_idx);
   }
   return expr_idx;
@@ -395,8 +396,8 @@ std::size_t SlicingTree::SelectIndexOfCut_() {
   auto block_or_cut = BlockOrCut{0};  // a dummy initial value that's not a cut
   auto expr_idx = std::size_t{0};     // a dummy initial value
   while (!block_or_cut.IsCut()) {
-    expr_idx
-        = std::uniform_int_distribution<>{0, polish_expr_.size() - 1}(twister_);
+    expr_idx = std::uniform_int_distribution<>{
+        0, static_cast<int>(polish_expr_.size() - 1)}(twister_);
     block_or_cut = polish_expr_.at(expr_idx);
   }
   return expr_idx;
