@@ -16,6 +16,8 @@
 
 namespace floorplan {
 
+class BlockOrCutWithTreeNodePtr;
+
 class BlockOrCut {
  public:
   std::shared_ptr<Block> GetBlock() const;
@@ -28,6 +30,9 @@ class BlockOrCut {
 
   explicit BlockOrCut(std::shared_ptr<Block> block) : block_or_cut_{block} {}
   explicit BlockOrCut(Cut cut) : block_or_cut_{cut} {}
+  /// @note Performs a slicing copy to drop the tree node. This is done by
+  /// intention.
+  explicit BlockOrCut(const BlockOrCutWithTreeNodePtr&);
 
  protected:
   std::variant<std::shared_ptr<Block>, Cut> block_or_cut_;
@@ -60,6 +65,14 @@ class SlicingTree {
   /// @brief Restores the previous perturbation.
   /// @note Only the latest previous perturbation can be restored.
   void Restore();
+
+  /// @brief Takes a snapshot on the polish expression.
+  /// @note This is particularly for storing the minimum area between
+  /// perturbations.
+  std::vector<BlockOrCut> Snapshot() const;
+  /// @brief Rebuilds the slicing tree from the snapshot of a polish expression.
+  /// @param snapshot Must be the snapshot of this particular slicing tree.
+  void RebuildFromSnapshot(const std::vector<BlockOrCut>& snapshot);
 
   unsigned Width() const;
   unsigned Height() const;

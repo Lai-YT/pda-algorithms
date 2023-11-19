@@ -38,6 +38,10 @@ bool BlockOrCut::IsCut() const {
   return std::holds_alternative<Cut>(block_or_cut_);
 }
 
+BlockOrCut::BlockOrCut(const BlockOrCutWithTreeNodePtr& bct) {
+  block_or_cut_ = bct.block_or_cut_;
+}
+
 void BlockOrCutWithTreeNodePtr::InvertCut() {
   assert(IsCut());
   block_or_cut_ = (GetCut() == Cut::kH ? Cut::kV : Cut::kH);
@@ -370,6 +374,22 @@ void SlicingTree::UpdatePairsFormedByNeighbors_(std::size_t cut,
   if (cut < polish_expr_.size() - 1 && polish_expr_.at(cut + 1).IsBlock()) {
     cut_and_block_pair_.push_back(cut);
   }
+}
+
+std::vector<BlockOrCut> SlicingTree::Snapshot() const {
+  auto snapshot = std::vector<BlockOrCut>{};
+  snapshot.reserve(polish_expr_.size());
+  std::copy(polish_expr_.cbegin(), polish_expr_.cend(),
+            std::back_insert_iterator{snapshot});
+  return snapshot;
+}
+
+void SlicingTree::RebuildFromSnapshot(const std::vector<BlockOrCut>& snapshot) {
+  assert(snapshot.size() == polish_expr_.size());
+  // NOTE: Converting a BlockOrCutWithTreeNodePtr to a BlockOrCut and then
+  // converting it back clears out the tree node pointer.
+  std::copy(snapshot.cbegin(), snapshot.cend(), polish_expr_.begin());
+  BuildTreeFromPolishExpr_();
 }
 
 unsigned SlicingTree::Width() const {
