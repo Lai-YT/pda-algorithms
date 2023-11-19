@@ -20,9 +20,9 @@ using namespace floorplan;
 /// BlockOrCut
 //
 
-ConstSharedBlockPtr BlockOrCut::GetBlock() const {
+std::shared_ptr<Block> BlockOrCut::GetBlock() const {
   assert(IsBlock());
-  return std::get<ConstSharedBlockPtr>(block_or_cut_);
+  return std::get<std::shared_ptr<Block>>(block_or_cut_);
 }
 
 Cut BlockOrCut::GetCut() const {
@@ -31,7 +31,7 @@ Cut BlockOrCut::GetCut() const {
 }
 
 bool BlockOrCut::IsBlock() const {
-  return std::holds_alternative<ConstSharedBlockPtr>(block_or_cut_);
+  return std::holds_alternative<std::shared_ptr<Block>>(block_or_cut_);
 }
 
 bool BlockOrCut::IsCut() const {
@@ -53,7 +53,7 @@ SlicingTree::SlicingTree(const std::vector<Block>& blocks) {
   assert(blocks.size() > 1);
   blocks_.reserve(blocks.size());
   for (const auto& block : blocks) {
-    blocks_.push_back(std::make_shared<const Block>(block));
+    blocks_.push_back(std::make_shared<Block>(block));
   }
   InitFloorplanPolishExpr_();
   BuildTreeFromPolishExpr_();

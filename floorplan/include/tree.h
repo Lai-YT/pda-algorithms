@@ -18,7 +18,7 @@ namespace floorplan {
 
 class BlockOrCut {
  public:
-  ConstSharedBlockPtr GetBlock() const;
+  std::shared_ptr<Block> GetBlock() const;
 
   Cut GetCut() const;
 
@@ -26,11 +26,11 @@ class BlockOrCut {
 
   bool IsCut() const;
 
-  explicit BlockOrCut(ConstSharedBlockPtr block) : block_or_cut_{block} {}
+  explicit BlockOrCut(std::shared_ptr<Block> block) : block_or_cut_{block} {}
   explicit BlockOrCut(Cut cut) : block_or_cut_{cut} {}
 
  protected:
-  std::variant<ConstSharedBlockPtr, Cut> block_or_cut_;
+  std::variant<std::shared_ptr<Block>, Cut> block_or_cut_;
 };
 
 class BlockOrCutWithTreeNodePtr : public BlockOrCut {
@@ -58,7 +58,7 @@ class SlicingTree {
   void Perturb();
 
   /// @brief Restores the previous perturbation.
-  /// @note Only the latest previous  perturbation can be restored.
+  /// @note Only the latest previous perturbation can be restored.
   void Restore();
 
   unsigned Width() const;
@@ -69,7 +69,7 @@ class SlicingTree {
   SlicingTree(const std::vector<Block>& blocks);
 
  private:
-  std::vector<ConstSharedBlockPtr> blocks_;
+  std::vector<std::shared_ptr<Block>> blocks_;
 
   /// @brief Record the moves so that we can restore the previous perturbation,
   /// especially to restore the tree structure. This also helps reduce memory

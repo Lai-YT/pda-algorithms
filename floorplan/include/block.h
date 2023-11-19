@@ -5,20 +5,19 @@
 
 namespace floorplan {
 
+struct Point {
+  int x;
+  int y;
+};
+
 struct Block {
   std::string name;
   unsigned width;
   unsigned height;
+
+  /// @brief The bottom-left coordinate of the block after the floorplanning.
+  Point bottom_left{0, 0};
 };
-
-// /// @brief For blocks with up/down relationships (H cut), they have to have
-// /// the same width for alignment; with left/right relationships (V cut), they
-// /// have to have the same height. PaddedBlock represent a block that has its
-// /// width or height padded to meet its adjacent block.
-// class PaddedBlock : Block {
-//   unsigned padded_width;
-
-// };
 
 }  // namespace floorplan
 

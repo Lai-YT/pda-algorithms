@@ -5,7 +5,6 @@
 #include <memory>
 
 #include "cut.h"
-#include "types.h"
 
 namespace floorplan {
 
@@ -64,6 +63,10 @@ class CutNode : public TreeNode {
   unsigned width_;
   unsigned height_;
 
+  // For blocks with up/down relationships (H cut), they have to have the same
+  // width for alignment; for those with left/right relationships (V cut), they
+  // have to have the same height.
+
   void UpdateWidth_();
   void UpdateHeight_();
 };
@@ -80,11 +83,11 @@ class BlockNode : public TreeNode {
 
   void Dump(std::ostream& out) const override;
 
-  BlockNode(ConstSharedBlockPtr block)
+  BlockNode(std::shared_ptr<Block> block)
       : TreeNode{nullptr, nullptr}, block_{block} {}
 
  private:
-  ConstSharedBlockPtr block_;
+  std::shared_ptr<Block> block_;
 };
 
 }  // namespace floorplan
