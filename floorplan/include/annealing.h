@@ -49,6 +49,7 @@ unsigned SimulateAnnealing(SlicingTree& tree, Input::AspectRatio constraint,
   assert(IsComplyWithAspectRatioConstraint(tree.Width(), tree.Height(),
                                            constraint));
   auto min_area = tree.Width() * tree.Height();
+  auto snapshot = tree.Snapshot();
   while (true) {
     auto moves = 0u;
     auto rejected_moves = 0u;
@@ -78,7 +79,11 @@ unsigned SimulateAnnealing(SlicingTree& tree, Input::AspectRatio constraint,
         if (cost > 0) {
           ++uphills;
         }
-        min_area = std::min(min_area, area);
+        if (area <= min_area) {
+          // We accept the move on equal areas.
+          min_area = area;
+          snapshot = tree.Snapshot();
+        }
       } else {
         tree.Restore();
         ++rejected_moves;
@@ -107,6 +112,9 @@ unsigned SimulateAnnealing(SlicingTree& tree, Input::AspectRatio constraint,
   std::cout << trials << " trials are made\n";
   std::cout << total_number_of_moves << " moves are made\n";
 #endif
+  tree.RebuildFromSnapshot(snapshot);
+  assert(tree.Width() * tree.Height() == min_area
+         && "the tree might be broken after the rebuild");
   return min_area;
 }
 
