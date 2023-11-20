@@ -30,14 +30,14 @@ If you're using a different compiler, you can specify it like this:
 make release CXX=<compiler>
 ```
 
-The executable will be located in the root of the subproject and named `Lab1`.
+The executable will be located in the root of the subproject and named `Partition`.
 
 ## 🎈 Usage
 
 To run the program, you can use the following command:
 
 ```sh
-./Lab1 IN OUT
+./Partition IN OUT
 ```
 
 - `IN`: Name of the input net connection file.

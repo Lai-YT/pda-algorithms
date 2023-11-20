@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-PROG=./Lab1
+PROG=./Partition
 OUT=heap.prof
 
 help() {
