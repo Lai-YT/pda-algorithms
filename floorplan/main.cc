@@ -31,8 +31,7 @@ int main(int argc, char* argv[]) {
   }
 #endif
   auto tree = SlicingTree{input.blocks};
-  auto area
-      = SimulateAnnealing(tree, input.aspect_ratio, 0.85, input.blocks.size());
+  SimulateAnnealing(tree, input.aspect_ratio, 0.85, input.blocks.size());
   if (auto out = std::ofstream{arg.out}; arg.area_only) {
     // Outputs only the area to the file.
     out << tree.Width() * tree.Height() << '\n';

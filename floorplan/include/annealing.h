@@ -24,8 +24,15 @@ bool IsComplyWithAspectRatioConstraint(unsigned width, unsigned height,
          && aspect_ratio < constraint.upper_bound;
 }
 
-unsigned SimulateAnnealing(SlicingTree& tree, Input::AspectRatio constraint,
-                           double cooling_factor, unsigned number_of_blocks) {
+/// @brief Use simulate annealing to floorplan the blocks represented by the
+/// tree.
+/// @param tree The slicing tree representing the floorplanning of blocks.
+/// @param constraint The constraint of the floorplanning.
+/// @param cooling_factor How fast the temperature cools down in the annealing
+/// schedule.
+/// @param number_of_blocks How many blocks there are.
+void SimulateAnnealing(SlicingTree& tree, Input::AspectRatio constraint,
+                       double cooling_factor, unsigned number_of_blocks) {
   const auto initial_temp_unit = 100000.0;
   const auto freezing_temp = 10.0;
   const auto num_of_unit_moves_per_temp = 1u;
@@ -119,7 +126,6 @@ unsigned SimulateAnnealing(SlicingTree& tree, Input::AspectRatio constraint,
   assert(tree.Width() * tree.Height() == min_area
          && "the tree might be broken after the rebuild");
   tree.UpdateCoordinateOfBlocks();
-  return min_area;
 }
 
 }  // namespace floorplan
