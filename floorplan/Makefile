@@ -1,4 +1,4 @@
-TARGET = Lab2
+TARGET = Floorplan
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -MMD -Iinclude
 

@@ -1,4 +1,4 @@
-TARGET = Lab1
+TARGET = Partition
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -MMD -Iinclude
 
