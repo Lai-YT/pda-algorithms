@@ -42,9 +42,12 @@ unsigned SimulateAnnealing(SlicingTree& tree, Input::AspectRatio constraint,
   auto trials = 0u;
   while (!IsComplyWithAspectRatioConstraint(tree.Width(), tree.Height(),
                                             constraint)) {
-    tree.Dump();
     tree.Perturb();
     ++trials;
+#ifdef DEBUG
+    std::cout << "========== [TRIAL " << trials << " ] ==========\n";
+    tree.Dump();
+#endif
   }
   assert(IsComplyWithAspectRatioConstraint(tree.Width(), tree.Height(),
                                            constraint));
@@ -115,6 +118,7 @@ unsigned SimulateAnnealing(SlicingTree& tree, Input::AspectRatio constraint,
   tree.RebuildFromSnapshot(snapshot);
   assert(tree.Width() * tree.Height() == min_area
          && "the tree might be broken after the rebuild");
+  tree.UpdateCoordinateOfBlocks();
   return min_area;
 }
 

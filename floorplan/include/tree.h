@@ -61,6 +61,10 @@ class SlicingTree {
 
   void Perturb();
 
+  /// @note This function has to called explicitly to have the result of the
+  /// perturbation actually affect the coordinate of the blocks.
+  void UpdateCoordinateOfBlocks();
+
   /// @brief Restores the previous perturbation.
   /// @note Only the latest previous perturbation can be restored.
   void Restore();

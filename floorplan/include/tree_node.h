@@ -20,6 +20,10 @@ class TreeNode {
   /// nodes, it's equal to the height of the block.
   virtual unsigned Height() const = 0;
 
+  virtual Point BottomLeftCoordinate() const = 0;
+
+  virtual void UpdateCoordinate(Point bottom_left) = 0;
+
   virtual void Dump(std::ostream& out) const = 0;
 
   TreeNode(std::shared_ptr<TreeNode> left, std::shared_ptr<TreeNode> right)
@@ -37,30 +41,32 @@ class CutNode : public TreeNode {
   /// @brief Recomputes the width and height of the subtree, ensuring
   /// synchronized updates.
   /// @note Bind the update of width and height to avoid overlooking either.
-  void Update();
+  void UpdateSize();
 
   void InvertCut();
 
-  unsigned Width() const override {
-    return width_;
-  }
+  unsigned Width() const override;
 
-  unsigned Height() const override {
-    return height_;
-  }
+  unsigned Height() const override;
+
+  Point BottomLeftCoordinate() const override;
+
+  void UpdateCoordinate(Point bottom_left) override;
 
   void Dump(std::ostream& out) const override;
 
   CutNode(Cut cut, std::shared_ptr<TreeNode> left,
           std::shared_ptr<TreeNode> right)
       : TreeNode{left, right}, cut_{cut} {
-    Update();
+    UpdateSize();
   }
 
  private:
   Cut cut_;
-  unsigned width_;
-  unsigned height_;
+
+  /// @brief Cut node holds a composite block, treating the entire subtree as a
+  /// block.
+  std::shared_ptr<Block> composite_block_ = std::make_shared<Block>();
 
   // For blocks with up/down relationships (H cut), they have to have the same
   // width for alignment; for those with left/right relationships (V cut), they
@@ -72,13 +78,13 @@ class CutNode : public TreeNode {
 
 class BlockNode : public TreeNode {
  public:
-  unsigned Width() const override {
-    return block_->width;
-  }
+  unsigned Width() const override;
 
-  unsigned Height() const override {
-    return block_->height;
-  }
+  unsigned Height() const override;
+
+  Point BottomLeftCoordinate() const override;
+
+  void UpdateCoordinate(Point bottom_left) override;
 
   void Dump(std::ostream& out) const override;
 

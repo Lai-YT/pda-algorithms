@@ -200,10 +200,10 @@ void SlicingTree::SwapBlockNode_(std::shared_ptr<BlockNode> a,
 
   // TODO: not to update common ancestors twice.
   for (auto parent = a->parent.lock(); parent; parent = parent->parent.lock()) {
-    parent->Update();
+    parent->UpdateSize();
   }
   for (auto parent = b->parent.lock(); parent; parent = parent->parent.lock()) {
-    parent->Update();
+    parent->UpdateSize();
   }
 }
 
@@ -269,7 +269,7 @@ void SlicingTree::SwapBlockNodeWithCutNode_(std::shared_ptr<BlockNode> block,
   cut->parent = parent_of_block;
 
   do {  // all the way up to the root
-    cut->Update();
+    cut->UpdateSize();
     cut = cut->parent.lock();
   } while (cut);
 }
@@ -342,10 +342,10 @@ void SlicingTree::ReverseBlockNodeWithCutNode_(std::shared_ptr<BlockNode> block,
 
   // parent_of_subtree is the least common ancestor, and block is the direct
   // child of it
-  cut->Update();
+  cut->UpdateSize();
   for (auto ancestor_of_block = block->parent.lock(); ancestor_of_block;
        ancestor_of_block = ancestor_of_block->parent.lock()) {
-    ancestor_of_block->Update();
+    ancestor_of_block->UpdateSize();
   }
 }
 
@@ -371,6 +371,10 @@ void SlicingTree::UpdatePairsFormedByNeighbors_(std::size_t cut,
   if (cut < polish_expr_.size() - 1 && polish_expr_.at(cut + 1).IsBlock()) {
     cut_and_block_pair_.push_back(cut);
   }
+}
+
+void SlicingTree::UpdateCoordinateOfBlocks() {
+  root_->UpdateCoordinate({0, 0});
 }
 
 std::vector<BlockOrCut> SlicingTree::Snapshot() const {
