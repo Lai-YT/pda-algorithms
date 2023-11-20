@@ -1,11 +1,9 @@
 #include "parser.h"
 
-#include <ios>
-#include <istream>
 #include <limits>
-#include <memory>
 #include <sstream>
 #include <string>
+#include <utility>  // move
 
 #include "block.h"
 

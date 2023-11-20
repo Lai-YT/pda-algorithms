@@ -1,16 +1,16 @@
 #include "tree.h"
 
 #include <algorithm>
-#include <array>
 #include <cassert>
+#include <iterator>
 #include <memory>
-#include <ostream>
 #include <random>
 #include <stack>
-#include <tuple>
+#include <string>   // operator<<
 #include <utility>  // pair
 #include <variant>
 
+#include "block.h"
 #include "cut.h"
 #include "tree_node.h"
 

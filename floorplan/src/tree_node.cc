@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <string>  // operator<<
 
 #include "cut.h"
 

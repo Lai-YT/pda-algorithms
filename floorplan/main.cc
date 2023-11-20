@@ -1,5 +1,7 @@
+#include <cstdio>  // perror
 #include <fstream>
 #include <iostream>
+#include <vector>
 
 #include "annealing.h"
 #include "arg.h"

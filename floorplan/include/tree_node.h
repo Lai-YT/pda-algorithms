@@ -4,12 +4,11 @@
 #include <iosfwd>
 #include <memory>
 
+#include "block.h"
 #include "cut.h"
 
 namespace floorplan {
 
-class TreeNode;
-class BlockNode;
 class CutNode;
 
 class TreeNode {

@@ -12,7 +12,6 @@
 #include "block.h"
 #include "cut.h"
 #include "tree_node.h"
-#include "types.h"
 
 namespace floorplan {
 
