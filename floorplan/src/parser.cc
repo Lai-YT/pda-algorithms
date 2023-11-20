@@ -32,7 +32,7 @@ void Parser::ParseBlocks_() {
 
 void Parser::ParseBlock_(std::string line) {
   auto ss = std::stringstream{std::move(line), std::ios_base::in};
-  auto block = Block{};
-  ss >> block.name >> block.width >> block.height;
+  auto block = std::make_shared<Block>();
+  ss >> block->name >> block->width >> block->height;
   input_.blocks.push_back(std::move(block));
 }

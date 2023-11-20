@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
   std::cout << input.aspect_ratio.lower_bound << ' '
             << input.aspect_ratio.upper_bound << '\n';
   for (const auto& block : input.blocks) {
-    std::cout << block.name << ' ' << block.width << ' ' << block.height
+    std::cout << block->name << ' ' << block->width << ' ' << block->height
               << '\n';
   }
 #endif

@@ -78,7 +78,7 @@ class SlicingTree {
 
   void Dump(std::ostream& out = std::cout) const;
 
-  SlicingTree(const std::vector<Block>& blocks);
+  SlicingTree(std::vector<std::shared_ptr<Block>> blocks);
 
  private:
   std::vector<std::shared_ptr<Block>> blocks_;

@@ -53,12 +53,9 @@ void BlockOrCutWithTreeNodePtr::InvertCut() {
 // SlicingTree
 //
 
-SlicingTree::SlicingTree(const std::vector<Block>& blocks) {
+SlicingTree::SlicingTree(std::vector<std::shared_ptr<Block>> blocks) {
   assert(blocks.size() > 1);
-  blocks_.reserve(blocks.size());
-  for (const auto& block : blocks) {
-    blocks_.push_back(std::make_shared<Block>(block));
-  }
+  blocks_ = std::move(blocks);
   InitFloorplanPolishExpr_();
   BuildTreeFromPolishExpr_();
 }

@@ -2,6 +2,7 @@
 #define FLOORPLAN_PARSER_H_
 
 #include <iosfwd>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -15,7 +16,7 @@ struct Input {
     double lower_bound;
   };
   AspectRatio aspect_ratio;
-  std::vector<Block> blocks;
+  std::vector<std::shared_ptr<Block>> blocks;
 };
 
 class Parser {
