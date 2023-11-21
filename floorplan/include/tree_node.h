@@ -41,8 +41,11 @@ class CutNode : public TreeNode {
   /// @brief Recomputes the width and height of the subtree, ensuring
   /// synchronized updates.
   /// @note Bind the update of width and height to avoid overlooking either.
+  /// @note This functions must be called explicitly, i.e., an update on the
+  /// child doesn't trigger the update of its parents.
   void UpdateSize();
 
+  /// @note Only the size of this particular cut node is updated.
   void InvertCut();
 
   unsigned Width() const override;

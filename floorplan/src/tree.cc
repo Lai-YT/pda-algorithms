@@ -148,6 +148,9 @@ void SlicingTree::Perturb() {
       while (ui < polish_expr_.size() && polish_expr_.at(ui).IsCut()) {
         ++ui;
       }
+      // NOTE: li + 1 is the direct parent of li, and li + 2 is the direct
+      // parent of li + 2. Thus, having InvertCut update the sizes along with
+      // the iteration did make the size of tree up to date.
       for (auto i = li; i < ui; i++) {
         polish_expr_.at(i).InvertCut();
       }
@@ -198,7 +201,8 @@ void SlicingTree::SwapBlockNode_(std::shared_ptr<BlockNode> a,
   }
   a->parent = b_parent;
 
-  // TODO: not to update common ancestors twice.
+  // NOTE: although we may be updating common ancestors twice, storing and
+  // identifying common ancestors may not be cheaper.
   for (auto parent = a->parent.lock(); parent; parent = parent->parent.lock()) {
     parent->UpdateSize();
   }

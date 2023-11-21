@@ -47,14 +47,7 @@ void CutNode::UpdateHeight_() {
 
 void CutNode::InvertCut() {
   cut_ = (cut_ == Cut::kH ? Cut::kV : Cut::kH);
-
   UpdateSize();
-  // TODO: Chained cut nodes are usually inverted together. In such cases, the
-  // ancestors are updated multiple time
-  for (auto parent_ = parent.lock(); parent_;
-       parent_ = parent_->parent.lock()) {
-    parent_->UpdateSize();
-  }
 }
 
 Point CutNode::BottomLeftCoordinate() const {
