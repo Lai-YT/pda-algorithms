@@ -126,7 +126,7 @@ void SlicingTree::Perturb() {
         block = SelectIndexOfBlock_();
       }
       std::swap(polish_expr_.at(block), polish_expr_.at(block + 1));
-      SwapBlockNode_(
+      SwapBlockNodes_(
           std::dynamic_pointer_cast<BlockNode>(polish_expr_.at(block).node),
           std::dynamic_pointer_cast<BlockNode>(
               polish_expr_.at(block + 1).node));
@@ -158,6 +158,7 @@ void SlicingTree::Perturb() {
     } break;
     case Move::kBlockAndCutSwap: {
       assert(!cut_and_block_pair_.empty());
+      // TODO: the cut doesn't have to be at the left hand side
       auto pair_idx = static_cast<std::size_t>(std::uniform_int_distribution<>{
           0, static_cast<int>(cut_and_block_pair_.size() - 1)}(twister_));
       auto cut = cut_and_block_pair_.at(pair_idx);
@@ -183,8 +184,8 @@ void SlicingTree::Perturb() {
   }
 }
 
-void SlicingTree::SwapBlockNode_(std::shared_ptr<BlockNode> a,
-                                 std::shared_ptr<BlockNode> b) {
+void SlicingTree::SwapBlockNodes_(std::shared_ptr<BlockNode> a,
+                                  std::shared_ptr<BlockNode> b) {
   auto a_parent = a->parent.lock();
   auto b_parent = b->parent.lock();
   if (a_parent->left == a) {
@@ -437,7 +438,7 @@ void SlicingTree::Restore() {
       auto [block_1, block_2] = prev_move_->index_of_nodes;
       assert(block_2 == block_1 + 1);
       std::swap(polish_expr_.at(block_1), polish_expr_.at(block_2));
-      SwapBlockNode_(
+      SwapBlockNodes_(
           std::dynamic_pointer_cast<BlockNode>(polish_expr_.at(block_1).node),
           std::dynamic_pointer_cast<BlockNode>(polish_expr_.at(block_2).node));
     } break;

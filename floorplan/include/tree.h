@@ -132,7 +132,7 @@ class SlicingTree {
   void BuildTreeFromPolishExpr_();
 
   /// @brief Updates the tree for block/block swaps.
-  void SwapBlockNode_(std::shared_ptr<BlockNode>, std::shared_ptr<BlockNode>);
+  void SwapBlockNodes_(std::shared_ptr<BlockNode>, std::shared_ptr<BlockNode>);
 
   /// @brief Updates the tree for block/cut swaps.
   void SwapBlockNodeWithCutNode_(std::shared_ptr<BlockNode> block,
