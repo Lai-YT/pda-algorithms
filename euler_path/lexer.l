@@ -23,7 +23,7 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "type.h"
+#include "mos.h"
 #include "y.tab.hh"
 
 // Use LINENO for the actual line number in the source code
@@ -51,9 +51,9 @@ NUMBER [0-9]+(\.[0-9]+)?
 {MOS_TYPE} {
   switch (yytext[0]) {
     case 'p':
-      return yy::parser::make_MOS_TYPE(euler::MosType::kPmos);
+      return yy::parser::make_MOS_TYPE(euler::Mos::Type::kP);
     case 'n':
-      return yy::parser::make_MOS_TYPE(euler::MosType::kNmos);
+      return yy::parser::make_MOS_TYPE(euler::Mos::Type::kN);
     default:
       assert(false && "Invalid MOS type");
   }

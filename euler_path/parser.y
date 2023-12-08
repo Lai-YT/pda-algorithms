@@ -5,18 +5,32 @@
 %{
 
 #include <iostream>
+#include <map>
 #include <string>
+#include <utility>
 
 #include "lex.yy.cc"
+#include "circuit.h"
 
+extern std::unique_ptr<euler::Circuit> circuit;
+
+static std::map<std::string, std::shared_ptr<euler::Net>> nets;
+
+static std::shared_ptr<euler::Net> GetOrCreateNet(const std::string& name);
+static std::shared_ptr<euler::Net> GetNetOrNull(const std::string& name);
+static void RegisterNet(std::shared_ptr<euler::Net> net);
 %}
 
 // Dependency code required for the value and location types;
 // inserts verbatim to the header file.
 %code requires {
+#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
-#include "type.h"
+#include "circuit.h"
+#include "mos.h"
 }
 
 %skeleton "lalr1.cc"
@@ -29,10 +43,6 @@
 %define api.value.type variant
 // Check whether symbols are constructed and destructed using RTTI.
 %define parse.assert
-// Copy may be expensive when using rich types, such as std::vector.
-// Also with automove, smart pointers can be moved implicitly without boilerplate std::move.
-// NOTE: can no longer reference a $x twice since it's moved in the first place.
-/* %define api.value.automove */
 // This guarantees that headers do not conflict when included together.
 %define api.token.prefix {TOK_}
 // Have messages report the unexpected token, and possibly the expected ones.
@@ -44,13 +54,16 @@
 
 /* keywords */
 %token SUBCKT ENDS
-%token <euler::MosType> MOS_TYPE
+%token <euler::Mos::Type> MOS_TYPE
 %token UNIT
 %token LENGTH WIDTH NFIN
 %token <std::string> NAME
 %token <double> NUMBER
 
-%nterm mos mos_list pin pin_list
+%nterm circuit
+%nterm <std::shared_ptr<euler::Mos>>mos
+%nterm <std::vector<std::shared_ptr<euler::Mos>>> mos_list
+%nterm net_list
 
 %token EOL
 %token EOF 0
@@ -58,31 +71,65 @@
 %%
 
 circuit:
-  SUBCKT NAME pin_list EOL
+  SUBCKT NAME net_list EOL
   mos_list
-  ENDS
+  ENDS {
+    circuit = std::make_unique<euler::Circuit>($5, std::move(nets));
+  }
   ;
 
-pin_list:
-  pin_list pin
-  | pin
+net_list:
+  net_list NAME {
+    auto net = std::make_shared<euler::Net>(std::move($2));
+    RegisterNet(net);
+  }
+  | NAME {
+    auto net = std::make_shared<euler::Net>(std::move($1));
+    RegisterNet(net);
+  }
   ;
 
 mos_list:
-  mos_list mos EOL
-  | mos EOL
+  mos_list mos EOL {
+    $$ = std::move($1);
+    $$.push_back($2);
+  }
+  | mos EOL {
+    $$ = std::vector<std::shared_ptr<euler::Mos>>{$1};
+  }
   ;
 
 mos:
-  /* (M)instance-name drain gate source substrate type width length nfin */
-  NAME pin pin pin pin MOS_TYPE WIDTH '=' NUMBER UNIT LENGTH '=' NUMBER UNIT NFIN '=' NUMBER
+  NAME NAME NAME NAME NAME MOS_TYPE WIDTH '=' NUMBER UNIT LENGTH '=' NUMBER UNIT NFIN '=' NUMBER {
+    $$ = euler::Mos::Create(/* name */ $1, /* type */ $6, GetOrCreateNet($2),
+                            GetOrCreateNet($3), GetOrCreateNet($4), GetOrCreateNet($5));
+    $$->RegisterToConnections();
+  }
   ;
 
-pin:
-  NAME
-  ;
 %%
 
 void yy::parser::error(const std::string& err) {
   std::cerr << err << std::endl;
+}
+
+static std::shared_ptr<euler::Net> GetOrCreateNet(const std::string& name) {
+    auto net = GetNetOrNull(name);
+    if (!net) {
+        net = std::make_shared<euler::Net>(name);
+        RegisterNet(net);
+    }
+    return net;
+}
+
+static std::shared_ptr<euler::Net> GetNetOrNull(const std::string& name) {
+  if (auto net = nets.find(name); net == nets.cend()) {
+    return nullptr;
+  } else {
+    return net->second;
+  }
+}
+
+static void RegisterNet(std::shared_ptr<euler::Net> net) {
+  nets.emplace(net->GetName(), net);
 }
