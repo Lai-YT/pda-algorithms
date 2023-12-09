@@ -12,7 +12,7 @@
 #include "lex.yy.cc"
 #include "circuit.h"
 
-extern std::unique_ptr<euler::Circuit> circuit;
+extern std::shared_ptr<euler::Circuit> circuit;
 
 static std::map<std::string, std::shared_ptr<euler::Net>> nets;
 
@@ -74,7 +74,7 @@ circuit:
   SUBCKT NAME net_list EOL
   mos_list
   ENDS {
-    circuit = std::make_unique<euler::Circuit>($5, std::move(nets));
+    circuit = std::make_shared<euler::Circuit>($5, std::move(nets));
   }
   ;
 
