@@ -5,6 +5,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -15,25 +16,39 @@ using namespace euler;
 
 namespace {
 
-bool IsConnected(const Mos& a, const Mos& b) {
-  return a.GetDrain() == b.GetDrain() || a.GetGate() == b.GetGate()
-         || a.GetSource() == b.GetSource()
-         || a.GetSubstrate() == b.GetSubstrate();
-}
+//
+// NOTE: One may say that the following functions should be member functions of
+// the PathFinder, and the parameters should be the data members. However, these
+// functions have to be called in a specific order, by passing the result of the
+// previous one as the parameter, we ensure that the order is correct. After
+// that, these functions doesn't depend on the data members of the PathFinder,
+// so they are not member functions.
+//
+
+bool IsConnected(const Mos& a, const Mos& b);
+
+std::size_t DegreeOf(const Vertex&, const Graph&);
+
+/// @brief The graph may not be fully connected. This function finds the Euler
+/// path of each connected subgraphs.
+std::vector<EulerPath> FindEulerPathOfSubgraphs(std::vector<std::set<Vertex>>,
+                                                Graph&);
+
+/// @param vertices The vertices of the subgraph.
+/// @param graph The entire graph.
+/// @note The vertices are assumed to be connected.
+EulerPath FindEulerPathOfSubgraph(std::set<Vertex> vertices, Graph& graph);
+
+/// @brief Find the connected subgraphs using DFS.
+std::vector<std::set<Vertex>> FindConnectedSubgraphs(const Graph&);
 
 }  // namespace
 
-/// @details In addressing the path finder problem, the objective is to identify
-/// an Euler path for both P MOS transistors and N MOS transistors. It is
-/// imperative that the paths for these two types of MOS transistors are
-/// identical. To achieve this, we form pairs by grouping a P MOS transistor
-/// with a corresponding N MOS transistor, based on the commonality of their
-/// connections, and subsequently seek an Euler path for each pair.
-void PathFinder::FindAPath() {
-  BuildGraph_();
+void PathFinder::FindPath() const {
+  auto graph = BuildGraph_();
 
   // Find a path to go through all the vertices once.
-  for (const auto& [vertex, neighbors] : graph_) {
+  for (const auto& [vertex, neighbors] : graph) {
     std::cout << vertex.first->GetName() << " " << vertex.second->GetName()
               << std::endl;
     for (const auto& neighbor : neighbors) {
@@ -41,9 +56,22 @@ void PathFinder::FindAPath() {
                 << neighbor.second->GetName() << std::endl;
     }
   }
+
+  // The graph may not be connected. We find a euler path for each connected
+  // subgraph, and then connect them by adding dummy.
+  auto paths = FindEulerPathOfSubgraphs(FindConnectedSubgraphs(graph), graph);
+
+  for (const auto& path : paths) {
+    for (const auto& [p, n] : path) {
+      std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
+    }
+    std::cout << "@@@" << std::endl;
+  }
+
+  // TODO: Connect the paths.
 }
 
-void PathFinder::GroupMosPairs_() {
+std::vector<Vertex> PathFinder::GroupMosPairs_() const {
   // Separate the P MOS transistors from the N MOS transistors.
   auto p_mos = std::map<std::shared_ptr<Net> /* gate */,
                         std::vector<std::shared_ptr<Mos>>>{};
@@ -57,6 +85,7 @@ void PathFinder::GroupMosPairs_() {
     }
   }
 
+  auto mos_pairs = std::vector<Vertex>{};
   // Group the P MOS transistors with the N MOS transistors.
   for (const auto& [gate, p_mos_with_same_gate] : p_mos) {
     assert(n_mos.find(gate) != n_mos.end()
@@ -67,8 +96,8 @@ void PathFinder::GroupMosPairs_() {
     if (p_mos_with_same_gate.size() == 1) {
       assert(n_mos_with_same_gate.size() == 1
              && "An N MOS should at least have a corresponding P MOS.");
-      mos_pairs_.emplace_back(p_mos_with_same_gate.front(),
-                              n_mos_with_same_gate.front());
+      mos_pairs.emplace_back(p_mos_with_same_gate.front(),
+                             n_mos_with_same_gate.front());
       continue;
     }
 
@@ -80,7 +109,7 @@ void PathFinder::GroupMosPairs_() {
       for (const auto& p : p_mos_with_same_gate) {
         if (p->GetDrain() == n->GetDrain() || p->GetSource() == n->GetSource()
             || p->GetSubstrate() == n->GetSubstrate()) {
-          mos_pairs_.emplace_back(p, n);
+          mos_pairs.emplace_back(p, n);
           std::cout << "[DEBUG] " << p->GetName() << " " << n->GetName()
                     << std::endl;
           remaining_p_mos.erase(
@@ -102,25 +131,116 @@ void PathFinder::GroupMosPairs_() {
 
     // While sometime multiple P and N MOS share only the gate. In such case, we
     // can pair them in any way.
-    // assert(remaining_n_mos.size() == remaining_p_mos.size());
-    for (int i = 0; i < remaining_n_mos.size(); ++i) {
-      mos_pairs_.emplace_back(remaining_p_mos.at(i), remaining_n_mos.at(i));
+    assert(remaining_n_mos.size() == remaining_p_mos.size());
+    for (auto i = std::size_t{0}; i < remaining_n_mos.size(); i++) {
+      mos_pairs.emplace_back(remaining_p_mos.at(i), remaining_n_mos.at(i));
     }
   }
+
+  return mos_pairs;
 }
 
-void PathFinder::BuildGraph_() {
-  GroupMosPairs_();
+std::map<Vertex, Neighbors> PathFinder::BuildGraph_() const {
+  auto graph = Graph{};
+  auto mos_pairs = GroupMosPairs_();
   // Each pair is a vertex in the graph. Two vertex are neighbors if they have
   // their P MOS connected and N MOS connected.
-  for (const auto& [p, n] : mos_pairs_) {
-    for (const auto& [p_, n_] : mos_pairs_) {
+  for (const auto& [p, n] : mos_pairs) {
+    for (const auto& [p_, n_] : mos_pairs) {
       if (p == p_ || n == n_) {
         continue;
       }
       if (IsConnected(*p, *p_) && IsConnected(*n, *n_)) {
-        graph_[{p, n}].emplace_back(p_, n_);
+        graph[{p, n}].emplace_back(p_, n_);
       }
     }
   }
+  return graph;
 }
+
+namespace {
+
+bool IsConnected(const Mos& a, const Mos& b) {
+  return a.GetDrain() == b.GetDrain() || a.GetGate() == b.GetGate()
+         || a.GetSource() == b.GetSource()
+         || a.GetSubstrate() == b.GetSubstrate();
+}
+
+std::size_t DegreeOf(const Vertex& vertex, const Graph& graph) {
+  return graph.at(vertex).size();
+}
+
+std::vector<EulerPath> FindEulerPathOfSubgraphs(
+    std::vector<std::set<Vertex>> vertices, Graph& graph) {
+  auto paths = std::vector<EulerPath>{};
+  for (const auto& connected_subgraph : vertices) {
+    paths.push_back(FindEulerPathOfSubgraph(connected_subgraph, graph));
+  }
+  return paths;
+}
+
+EulerPath FindEulerPathOfSubgraph(std::set<Vertex> vertices, Graph& graph) {
+  // Hierholzer's algorithm
+  auto path = EulerPath{};
+  auto stack = std::vector<Vertex>{};
+  auto current = *vertices.begin();
+  while (!vertices.empty()) {
+    if (DegreeOf(current, graph) == 0) {
+      // If the current vertex has no neighbor, then it is the end of a path.
+      // We add it to the path and remove it from the graph.
+      path.push_back(current);
+      vertices.erase(current);
+      if (stack.empty()) {
+        // If the stack is empty, then we have found a path.
+        break;
+      }
+      current = stack.back();
+      stack.pop_back();
+    } else {
+      // If the current vertex has neighbor, then we add it to the stack and go
+      // to the neighbor.
+      stack.push_back(current);
+      // Remove such neighbor from the graph to ensure that we do not visit it
+      // again.
+      // NOTE: This is destructive to the graph.
+      auto next_current = graph.at(current).back();
+      graph.at(current).pop_back();
+      current = next_current;
+    }
+  }
+  assert(std::all_of(graph.cbegin(), graph.cend(),
+                     [](const auto& vertex_neighbors) {
+                       return vertex_neighbors.second.empty();
+                     })
+         && "The sub graph should be fully connected.");
+
+  return path;
+}
+
+std::vector<std::set<Vertex>> FindConnectedSubgraphs(const Graph& graph) {
+  auto visited = std::set<Vertex>{};
+  auto connected_subgraphs = std::vector<std::set<Vertex>>{};
+  for (const auto& [vertex, neighbors] : graph) {
+    if (visited.find(vertex) != visited.cend()) {
+      continue;
+    }
+    auto connected_subgraph = std::set<Vertex>{};
+    auto stack = std::vector<Vertex>{vertex};
+    while (!stack.empty()) {
+      auto current = stack.back();
+      stack.pop_back();
+      if (visited.find(current) != visited.end()) {
+        continue;
+      }
+      visited.insert(current);
+      connected_subgraph.insert(current);
+      for (const auto& neighbor : graph.at(current)) {
+        stack.push_back(neighbor);
+      }
+    }
+    connected_subgraphs.push_back(connected_subgraph);
+  }
+  return connected_subgraphs;
+}
+
+}  // namespace

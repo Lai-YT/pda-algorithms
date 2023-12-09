@@ -11,23 +11,30 @@ namespace euler {
 class Mos;
 struct Circuit;
 
+using Vertex = std::pair<std::shared_ptr<Mos>, std::shared_ptr<Mos>>;
+using Neighbors = std::vector<Vertex>;
+using EulerPath = std::vector<Vertex>;
+using Graph = std::map<Vertex, Neighbors>;
+
 class PathFinder {
  public:
-  using Vertex = std::pair<std::shared_ptr<Mos>, std::shared_ptr<Mos>>;
+  /// @details In addressing the path finder problem, the objective is to
+  /// identify an Euler path for both P MOS transistors and N MOS transistors.
+  /// It is imperative that the paths for these two types of MOS transistors are
+  /// identical. To achieve this, we form pairs by grouping a P MOS transistor
+  /// with a corresponding N MOS transistor, based on the commonality of their
+  /// connections, and subsequently seek an Euler path for each pair.
+  void FindPath() const;
 
-  void FindAPath();
-
-  PathFinder(std::shared_ptr<Circuit> circuit) : circuit_{std::move(circuit)} {}
+  PathFinder(const std::shared_ptr<Circuit>& circuit) : circuit_{circuit} {}
 
  private:
-  std::shared_ptr<Circuit> circuit_;
+  const std::shared_ptr<Circuit>& circuit_;
 
-  std::vector<Vertex> mos_pairs_{};
-  std::map<Vertex, std::vector<Vertex>> graph_{};
+  std::vector<Vertex> GroupMosPairs_() const;
 
-  void GroupMosPairs_();
   // O(v^2)
-  void BuildGraph_();
+  Graph BuildGraph_() const;
 };
 
 }  // namespace euler

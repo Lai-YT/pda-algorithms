@@ -42,7 +42,7 @@ int main(int argc, char const* argv[]) {
   }
 
   auto path_finder = PathFinder{circuit};
-  path_finder.FindAPath();
+  path_finder.FindPath();
 
   return 0;
 }
