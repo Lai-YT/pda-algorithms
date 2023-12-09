@@ -101,8 +101,10 @@ mos_list:
 
 mos:
   NAME NAME NAME NAME NAME MOS_TYPE WIDTH '=' NUMBER UNIT LENGTH '=' NUMBER UNIT NFIN '=' NUMBER {
-    $$ = euler::Mos::Create(/* name */ $1, /* type */ $6, GetOrCreateNet($2),
-                            GetOrCreateNet($3), GetOrCreateNet($4), GetOrCreateNet($5));
+    auto instance_name = ($1).substr(1);  // Remove the leading 'M'.
+    $$ = euler::Mos::Create(instance_name, /* type */ $6, GetOrCreateNet($2),
+                            GetOrCreateNet($3), GetOrCreateNet($4),
+                            GetOrCreateNet($5));
     $$->RegisterToConnections();
   }
   ;
