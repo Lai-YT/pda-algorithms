@@ -27,12 +27,14 @@ int main(int argc, char const* argv[]) {
     return ret;
   }
 
+  std::cout << "=== Circuit ===" << std::endl;
   for (const auto& mos : circuit->mos) {
     std::cout << mos->GetName() << " " << mos->GetDrain()->GetName() << " "
               << mos->GetGate()->GetName() << " " << mos->GetSource()->GetName()
               << " " << mos->GetSubstrate()->GetName() << std::endl;
   }
 
+  std::cout << "=== Nets ===" << std::endl;
   for (const auto& [_, net] : circuit->nets) {
     std::cout << net->GetName();
     for (const auto& connection : net->Connections()) {

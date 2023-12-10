@@ -48,6 +48,7 @@ void PathFinder::FindPath() const {
   auto graph = BuildGraph_();
 
   // Find a path to go through all the vertices once.
+  std::cout << "=== Graph ===" << std::endl;
   for (const auto& [vertex, neighbors] : graph) {
     std::cout << vertex.first->GetName() << " " << vertex.second->GetName()
               << std::endl;
@@ -61,6 +62,7 @@ void PathFinder::FindPath() const {
   // subgraph, and then connect them by adding dummy.
   auto paths = FindEulerPathOfSubgraphs(FindConnectedSubgraphs(graph), graph);
 
+  std::cout << "=== Paths ===" << std::endl;
   for (const auto& path : paths) {
     for (const auto& [p, n] : path) {
       std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
@@ -110,8 +112,6 @@ std::vector<Vertex> PathFinder::GroupMosPairs_() const {
         if (p->GetDrain() == n->GetDrain() || p->GetSource() == n->GetSource()
             || p->GetSubstrate() == n->GetSubstrate()) {
           mos_pairs.emplace_back(p, n);
-          std::cout << "[DEBUG] " << p->GetName() << " " << n->GetName()
-                    << std::endl;
           remaining_p_mos.erase(
               std::find_if(remaining_p_mos.begin(), remaining_p_mos.end(),
                            [&p](const auto& p_) { return p_ == p; }));
@@ -135,6 +135,11 @@ std::vector<Vertex> PathFinder::GroupMosPairs_() const {
     for (auto i = std::size_t{0}; i < remaining_n_mos.size(); i++) {
       mos_pairs.emplace_back(remaining_p_mos.at(i), remaining_n_mos.at(i));
     }
+  }
+
+  std::cout << "=== MOS pairs ===" << std::endl;
+  for (const auto& [p, n] : mos_pairs) {
+    std::cout << p->GetName() << " " << n->GetName() << std::endl;
   }
 
   return mos_pairs;
@@ -174,6 +179,7 @@ std::size_t DegreeOf(const Vertex& vertex, const Graph& graph) {
 std::vector<EulerPath> FindEulerPathOfSubgraphs(
     std::vector<std::set<Vertex>> vertices, Graph& graph) {
   auto paths = std::vector<EulerPath>{};
+  std::cout << "Number of subgraphs: " << vertices.size() << std::endl;
   for (const auto& connected_subgraph : vertices) {
     paths.push_back(FindEulerPathOfSubgraph(connected_subgraph, graph));
   }
@@ -239,6 +245,8 @@ std::vector<std::set<Vertex>> FindConnectedSubgraphs(const Graph& graph) {
         stack.push_back(neighbor);
       }
     }
+    std::cout << "Connected subgraph size: " << connected_subgraph.size()
+              << std::endl;
     connected_subgraphs.push_back(connected_subgraph);
   }
   return connected_subgraphs;
