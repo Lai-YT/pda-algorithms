@@ -42,6 +42,35 @@ EulerPath FindEulerPathOfSubgraph(std::set<Vertex> vertices, Graph& graph);
 /// @brief Find the connected subgraphs using DFS.
 std::vector<std::set<Vertex>> FindConnectedSubgraphs(const Graph&);
 
+/// @brief To connect two paths, we add a dummy to end of the first path, and a
+/// dummy to the start of the second path. These 2 dummies are then connected
+/// with a dummy net.
+/// @details The order of Nets in the path corresponds to the sequence of
+/// connections. For a MOS, which typically has 4 pins, two of these pins are
+/// commonly connected to the same point. As a result, the standard order is
+/// (left, gate, right). Notably, there are only 3 connections in this order.
+/// However, if a MOS has all 4 pins connected to different points, and it acts
+/// as either the starting or ending point of the path, we choose one pin to
+/// exclude.
+EulerPath ConnectEulerPathOfSubgraphsWithDummy(const std::vector<EulerPath>&);
+
+/// @note In case of multiply connections, we choose one in unspecified order.
+Edge FindEdgeOfTwoNeighborVertices(const Vertex& a, const Vertex& b);
+
+/// @brief If the length of the Euler path is 1, nets other then the gate
+// are free. Otherwise, the free net is the one that is not used as connection
+// between the next vertex or the gate. Note that there may be multiple free
+// nets, we choose the one that is discovered first.
+Edge FindFreeNetOfStartingVertex(const EulerPath&);
+
+/// @brief If the length of the Euler path is 1, nets other then the gate
+// are free. Otherwise, the free net is the one that is not used as connection
+// between the previous vertex or the gate. Note that there may be multiple free
+// nets, we choose the one that is discovered first.
+Edge FindFreeNetOfEndingVertex(const EulerPath&);
+
+std::set<std::shared_ptr<Net>> NetsOf(const Mos&);
+
 }  // namespace
 
 void PathFinder::FindPath() const {
@@ -61,7 +90,6 @@ void PathFinder::FindPath() const {
   // The graph may not be connected. We find a euler path for each connected
   // subgraph, and then connect them by adding dummy.
   auto paths = FindEulerPathOfSubgraphs(FindConnectedSubgraphs(graph), graph);
-
   std::cout << "=== Paths ===" << std::endl;
   for (const auto& path : paths) {
     for (const auto& [p, n] : path) {
@@ -70,7 +98,11 @@ void PathFinder::FindPath() const {
     std::cout << "@@@" << std::endl;
   }
 
-  // TODO: Connect the paths.
+  auto path = ConnectEulerPathOfSubgraphsWithDummy(paths);
+  std::cout << "=== Connect Path ===" << std::endl;
+  for (const auto& [p, n] : path) {
+    std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
+  }
 }
 
 std::vector<Vertex> PathFinder::GroupMosPairs_() const {
@@ -250,6 +282,135 @@ std::vector<std::set<Vertex>> FindConnectedSubgraphs(const Graph& graph) {
     connected_subgraphs.push_back(connected_subgraph);
   }
   return connected_subgraphs;
+}
+
+EulerPath ConnectEulerPathOfSubgraphsWithDummy(
+    const std::vector<EulerPath>& paths) {
+  if (paths.size() == 1) {
+    return paths.front();
+  }
+  auto path = EulerPath{paths.front()};
+  for (auto i = std::size_t{1}; i < paths.size(); i++) {
+    // Get the net that is free (not already used as an edge) to be connected
+    // with the dummy.
+    // The 2 dummies are connected with the dummy net.
+    auto dummy_net = std::make_pair(std::make_shared<Net>("Dummy"),
+                                    std::make_shared<Net>("Dummy"));
+    auto ending_vertex = path.back();
+    auto ending_free_net = FindFreeNetOfEndingVertex(path);
+    auto gate_of_ending_dummy = std::make_shared<Net>("Dummy");
+    auto ending_dummy = Vertex{
+        Mos::Create("Dummy", Mos::Type::kP, ending_free_net.first,
+                    gate_of_ending_dummy, dummy_net.first, dummy_net.first),
+        Mos::Create("Dummy", Mos::Type::kN, ending_free_net.second,
+                    gate_of_ending_dummy, dummy_net.second, dummy_net.second)};
+    auto starting_vertex = paths.at(i).front();
+    auto starting_free_net = FindFreeNetOfStartingVertex(paths.at(i));
+    auto gate_of_starting_dummy = std::make_shared<Net>("Dummy");
+    auto starting_dummy = Vertex{
+        Mos::Create("Dummy", Mos::Type::kP, starting_free_net.first,
+                    gate_of_starting_dummy, dummy_net.first, dummy_net.first),
+        Mos::Create("Dummy", Mos::Type::kN, starting_free_net.second,
+                    gate_of_starting_dummy, dummy_net.second,
+                    dummy_net.second)};
+    path.push_back(ending_dummy);
+    path.push_back(starting_dummy);
+    path.insert(path.cend(), paths.at(i).cbegin(), paths.at(i).cend());
+  }
+  return path;
+}
+
+Edge FindEdgeOfTwoNeighborVertices(const Vertex& a, const Vertex& b) {
+  auto nets_of_a = std::make_pair(NetsOf(*a.first), NetsOf(*a.second));
+  auto nets_of_b = std::make_pair(NetsOf(*b.first), NetsOf(*b.second));
+  std::cout << "=== P MOS ===" << std::endl;
+  for (const auto& net : nets_of_a.first) {
+    std::cout << "Nets of " << a.first->GetName() << ": " << net->GetName()
+              << std::endl;
+  }
+  for (const auto& net : nets_of_b.first) {
+    std::cout << "Nets of " << b.first->GetName() << ": " << net->GetName()
+              << std::endl;
+  }
+  std::cout << "=== N MOS ===" << std::endl;
+  for (const auto& net : nets_of_a.second) {
+    std::cout << "Nets of " << a.second->GetName() << ": " << net->GetName()
+              << std::endl;
+  }
+  for (const auto& net : nets_of_b.second) {
+    std::cout << "Nets of " << b.second->GetName() << ": " << net->GetName()
+              << std::endl;
+  }
+  auto p_mos_intersection = std::vector<std::shared_ptr<Net>>{};
+  auto n_mos_intersection = std::vector<std::shared_ptr<Net>>{};
+  std::set_intersection(nets_of_a.first.cbegin(), nets_of_a.first.cend(),
+                        nets_of_b.first.cbegin(), nets_of_b.first.cend(),
+                        std::back_inserter(p_mos_intersection));
+  std::set_intersection(nets_of_a.second.cbegin(), nets_of_a.second.cend(),
+                        nets_of_b.second.cbegin(), nets_of_b.second.cend(),
+                        std::back_inserter(n_mos_intersection));
+  std::cout << a.first->GetName() << " " << b.first->GetName() << std::endl;
+  for (const auto& net : p_mos_intersection) {
+    std::cout << "P MOS intersection: " << net->GetName() << std::endl;
+  }
+  std::cout << a.second->GetName() << " " << b.second->GetName() << std::endl;
+  for (const auto& net : n_mos_intersection) {
+    std::cout << "N MOS intersection: " << net->GetName() << std::endl;
+  }
+  return {p_mos_intersection.front(), n_mos_intersection.front()};
+}
+
+Edge FindFreeNetOfStartingVertex(const EulerPath& path) {
+  auto free_net = Edge{};
+  auto starting_vertex = path.begin();
+  auto connection = std::make_pair<std::shared_ptr<Net>, std::shared_ptr<Net>>(
+      starting_vertex->first->GetGate(), starting_vertex->second->GetGate());
+  if (path.size() != 1) {
+    connection = FindEdgeOfTwoNeighborVertices(*starting_vertex,
+                                               *std::next(starting_vertex));
+  }
+  for (auto net : NetsOf(*starting_vertex->first)) {
+    if (net != starting_vertex->first->GetGate() && net != connection.first) {
+      free_net.first = net;
+      break;
+    }
+  }
+  for (auto net : NetsOf(*starting_vertex->second)) {
+    if (net != starting_vertex->second->GetGate() && net != connection.second) {
+      free_net.second = net;
+      break;
+    }
+  }
+  return free_net;
+}
+
+Edge FindFreeNetOfEndingVertex(const EulerPath& path) {
+  auto free_net = Edge{};
+  auto ending_vertex = std::prev(path.end());
+  auto connection = std::make_pair<std::shared_ptr<Net>, std::shared_ptr<Net>>(
+      ending_vertex->first->GetGate(), ending_vertex->second->GetGate());
+  if (path.size() != 1) {
+    connection = FindEdgeOfTwoNeighborVertices(*ending_vertex,
+                                               *std::prev(ending_vertex));
+  }
+  for (auto net : NetsOf(*ending_vertex->first)) {
+    if (net != ending_vertex->first->GetGate() && net != connection.first) {
+      free_net.first = net;
+      break;
+    }
+  }
+  for (auto net : NetsOf(*ending_vertex->second)) {
+    if (net != ending_vertex->second->GetGate() && net != connection.second) {
+      free_net.second = net;
+      break;
+    }
+  }
+  return free_net;
+}
+
+std::set<std::shared_ptr<Net>> NetsOf(const Mos& mos) {
+  return std::set<std::shared_ptr<Net>>{mos.GetDrain(), mos.GetGate(),
+                                        mos.GetSource(), mos.GetSubstrate()};
 }
 
 }  // namespace
