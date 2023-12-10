@@ -146,12 +146,13 @@ std::map<Vertex, Neighbors> PathFinder::BuildGraph_() const {
   // Each pair is a vertex in the graph. Two vertex are neighbors if they have
   // their P MOS connected and N MOS connected.
   for (const auto& [p, n] : mos_pairs) {
+    graph[{p, n}] = Neighbors{};
     for (const auto& [p_, n_] : mos_pairs) {
       if (p == p_ || n == n_) {
         continue;
       }
       if (IsConnected(*p, *p_) && IsConnected(*n, *n_)) {
-        graph[{p, n}].emplace_back(p_, n_);
+        graph.at({p, n}).emplace_back(p_, n_);
       }
     }
   }
