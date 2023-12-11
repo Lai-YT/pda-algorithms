@@ -69,6 +69,9 @@ Edge FindFreeNetOfStartingVertex(const EulerPath&);
 // nets, we choose the one that is discovered first.
 Edge FindFreeNetOfEndingVertex(const EulerPath&);
 
+/// @return The nets that connect the MOS in the Euler path.
+std::vector<Edge> GetEdgesOf(const EulerPath&);
+
 std::set<std::shared_ptr<Net>> NetsOf(const Mos&);
 
 }  // namespace
@@ -99,8 +102,14 @@ void PathFinder::FindPath() const {
   }
 
   auto path = ConnectEulerPathOfSubgraphsWithDummy(paths);
+  auto edges = GetEdgesOf(path);
+
   std::cout << "=== Connect Path ===" << std::endl;
   for (const auto& [p, n] : path) {
+    std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
+  }
+  std::cout << "=== Corresponding Net ===" << std::endl;
+  for (const auto& [p, n] : edges) {
     std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
   }
 }
@@ -406,6 +415,16 @@ Edge FindFreeNetOfEndingVertex(const EulerPath& path) {
     }
   }
   return free_net;
+}
+
+std::vector<Edge> GetEdgesOf(const EulerPath& path) {
+  auto edges = std::vector<Edge>{};
+  edges.push_back(FindFreeNetOfStartingVertex(path));
+  for (auto i = std::size_t{1}; i < path.size(); i++) {
+    edges.push_back(FindEdgeOfTwoNeighborVertices(path.at(i - 1), path.at(i)));
+  }
+  edges.push_back(FindFreeNetOfEndingVertex(path));
+  return edges;
 }
 
 std::set<std::shared_ptr<Net>> NetsOf(const Mos& mos) {
