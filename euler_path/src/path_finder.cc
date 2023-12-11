@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -19,28 +21,12 @@ namespace {
 //
 // NOTE: One may say that the following functions should be member functions of
 // the PathFinder, and the parameters should be the data members. However, these
-// functions have to be called in a specific order, by passing the result of the
-// previous one as the parameter, we ensure that the order is correct. After
-// that, these functions doesn't depend on the data members of the PathFinder,
-// so they are not member functions.
+// functions doesn't depend on the data members of the PathFinder, so they are
+// not member functions.
 //
 
 bool IsConnected(const Mos& a, const Mos& b);
-
-std::size_t DegreeOf(const Vertex&, const Graph&);
-
-/// @brief The graph may not be fully connected. This function finds the Euler
-/// path of each connected subgraphs.
-std::vector<EulerPath> FindEulerPathOfSubgraphs(std::vector<std::set<Vertex>>,
-                                                Graph&);
-
-/// @param vertices The vertices of the subgraph.
-/// @param graph The entire graph.
-/// @note The vertices are assumed to be connected.
-EulerPath FindEulerPathOfSubgraph(std::set<Vertex> vertices, Graph& graph);
-
-/// @brief Find the connected subgraphs using DFS.
-std::vector<std::set<Vertex>> FindConnectedSubgraphs(const Graph&);
+bool IsConnected(const Vertex& a, const Vertex& b);
 
 /// @brief To connect two paths, we add a dummy to end of the first path, and a
 /// dummy to the start of the second path. These 2 dummies are then connected
@@ -52,47 +38,47 @@ std::vector<std::set<Vertex>> FindConnectedSubgraphs(const Graph&);
 /// However, if a MOS has all 4 pins connected to different points, and it acts
 /// as either the starting or ending point of the path, we choose one pin to
 /// exclude.
-EulerPath ConnectEulerPathOfSubgraphsWithDummy(const std::vector<EulerPath>&);
+HamiltonPath ConnectHamiltonPathOfSubgraphsWithDummy(
+    const std::vector<HamiltonPath>&);
 
 /// @note In case of multiply connections, we choose one in unspecified order.
 Edge FindEdgeOfTwoNeighborVertices(const Vertex& a, const Vertex& b);
 
-/// @brief If the length of the Euler path is 1, nets other then the gate
+/// @brief If the length of the Hamilton path is 1, nets other then the gate
 // are free. Otherwise, the free net is the one that is not used as connection
 // between the next vertex or the gate. Note that there may be multiple free
 // nets, we choose the one that is discovered first.
-Edge FindFreeNetOfStartingVertex(const EulerPath&);
+Edge FindFreeNetOfStartingVertex(const HamiltonPath&);
 
-/// @brief If the length of the Euler path is 1, nets other then the gate
+/// @brief If the length of the Hamilton path is 1, nets other then the gate
 // are free. Otherwise, the free net is the one that is not used as connection
 // between the previous vertex or the gate. Note that there may be multiple free
 // nets, we choose the one that is discovered first.
-Edge FindFreeNetOfEndingVertex(const EulerPath&);
+Edge FindFreeNetOfEndingVertex(const HamiltonPath&);
 
-/// @return The nets that connect the MOS in the Euler path.
-std::vector<Edge> GetEdgesOf(const EulerPath&);
+/// @return The nets that connect the MOS in the Hamilton path.
+std::vector<Edge> GetEdgesOf(const HamiltonPath&);
 
 std::set<std::shared_ptr<Net>> NetsOf(const Mos&);
 
 }  // namespace
 
-void PathFinder::FindPath() const {
-  auto graph = BuildGraph_();
+void PathFinder::FindPath() {
+  GroupVertices_();
+  BuildGraph_();
 
   // Find a path to go through all the vertices once.
   std::cout << "=== Graph ===" << std::endl;
-  for (const auto& [vertex, neighbors] : graph) {
+  for (const auto& vertex : vertices_) {
     std::cout << vertex.first->GetName() << " " << vertex.second->GetName()
               << std::endl;
-    for (const auto& neighbor : neighbors) {
+    for (const auto& neighbor : adjacency_list_.at(vertex)) {
       std::cout << "  " << neighbor.first->GetName() << " "
                 << neighbor.second->GetName() << std::endl;
     }
   }
 
-  // The graph may not be connected. We find a euler path for each connected
-  // subgraph, and then connect them by adding dummy.
-  auto paths = FindEulerPathOfSubgraphs(FindConnectedSubgraphs(graph), graph);
+  auto paths = FindHamiltonPaths_();
   std::cout << "=== Paths ===" << std::endl;
   for (const auto& path : paths) {
     for (const auto& [p, n] : path) {
@@ -101,7 +87,7 @@ void PathFinder::FindPath() const {
     std::cout << "@@@" << std::endl;
   }
 
-  auto path = ConnectEulerPathOfSubgraphsWithDummy(paths);
+  auto path = ConnectHamiltonPathOfSubgraphsWithDummy(paths);
   auto edges = GetEdgesOf(path);
 
   std::cout << "=== Connect Path ===" << std::endl;
@@ -114,7 +100,7 @@ void PathFinder::FindPath() const {
   }
 }
 
-std::vector<Vertex> PathFinder::GroupMosPairs_() const {
+void PathFinder::GroupVertices_() {
   // Separate the P MOS transistors from the N MOS transistors.
   auto p_mos = std::map<std::shared_ptr<Net> /* gate */,
                         std::vector<std::shared_ptr<Mos>>>{};
@@ -128,7 +114,6 @@ std::vector<Vertex> PathFinder::GroupMosPairs_() const {
     }
   }
 
-  auto mos_pairs = std::vector<Vertex>{};
   // Group the P MOS transistors with the N MOS transistors.
   for (const auto& [gate, p_mos_with_same_gate] : p_mos) {
     assert(n_mos.find(gate) != n_mos.end()
@@ -139,7 +124,7 @@ std::vector<Vertex> PathFinder::GroupMosPairs_() const {
     if (p_mos_with_same_gate.size() == 1) {
       assert(n_mos_with_same_gate.size() == 1
              && "An N MOS should at least have a corresponding P MOS.");
-      mos_pairs.emplace_back(p_mos_with_same_gate.front(),
+      vertices_.emplace_back(p_mos_with_same_gate.front(),
                              n_mos_with_same_gate.front());
       continue;
     }
@@ -155,7 +140,7 @@ std::vector<Vertex> PathFinder::GroupMosPairs_() const {
         // MOS.
         if (p->GetDrain() == n->GetDrain()
             || p->GetSource() == n->GetSource()) {
-          mos_pairs.emplace_back(p, n);
+          vertices_.emplace_back(p, n);
           remaining_p_mos.erase(
               std::find_if(remaining_p_mos.begin(), remaining_p_mos.end(),
                            [&p](const auto& p_) { return p_ == p; }));
@@ -177,38 +162,141 @@ std::vector<Vertex> PathFinder::GroupMosPairs_() const {
     // can pair them in any way.
     assert(remaining_n_mos.size() == remaining_p_mos.size());
     for (auto i = std::size_t{0}; i < remaining_n_mos.size(); i++) {
-      mos_pairs.emplace_back(remaining_p_mos.at(i), remaining_n_mos.at(i));
+      vertices_.emplace_back(remaining_p_mos.at(i), remaining_n_mos.at(i));
     }
   }
 
   std::cout << "=== MOS pairs ===" << std::endl;
-  for (const auto& [p, n] : mos_pairs) {
-    std::cout << p->GetName() << " " << n->GetName() << std::endl;
+  for (const auto& [p, n] : vertices_) {
+    std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
   }
-
-  return mos_pairs;
 }
 
-std::map<Vertex, Neighbors> PathFinder::BuildGraph_() const {
-  auto graph = Graph{};
-  auto mos_pairs = GroupMosPairs_();
+void PathFinder::BuildGraph_() {
   // Each pair is a vertex in the graph. Two vertex are neighbors if they have
   // their P MOS connected and N MOS connected.
-  for (const auto& [p, n] : mos_pairs) {
-    graph[{p, n}] = Neighbors{};
-    for (const auto& [p_, n_] : mos_pairs) {
-      if (p == p_ || n == n_) {
+  for (const auto& v : vertices_) {
+    adjacency_list_[v] = Neighbors{};
+    for (const auto& v_ : vertices_) {
+      if (v == v_) {
         continue;
       }
-      if (IsConnected(*p, *p_) && IsConnected(*n, *n_)) {
-        graph.at({p, n}).emplace_back(p_, n_);
+      if (IsConnected(v, v_)) {
+        adjacency_list_.at(v).push_back(v_);
       }
     }
   }
-  return graph;
+}
+
+std::vector<HamiltonPath> PathFinder::FindHamiltonPaths_() {
+  // Select from the to visited list should be faster than iterating through all
+  // the vertices and checking whether they are in the visited list.
+  auto to_visit = std::set<Vertex>{vertices_.cbegin(), vertices_.cend()};
+  auto paths = std::vector<HamiltonPath>{};
+  while (!to_visit.empty()) {
+    // Randomly select a vertex to start. We select the first one for
+    // simplicity.
+    auto path = HamiltonPath{*to_visit.begin()};
+    to_visit.erase(to_visit.begin());
+
+    // Find a Hamilton path.
+    while (true) {
+      if (auto extended_path = Extend_(path, to_visit); extended_path) {
+        path = std::move(*extended_path);
+        continue;
+      }
+
+      // Can no longer extend. Try to rotate the path.
+      auto found = false;
+      for (const auto& rotated_path : Rotate_(path)) {
+        if (auto extended_path = Extend_(rotated_path, to_visit);
+            extended_path) {
+          path = std::move(*extended_path);
+          found = true;
+          break;
+        }
+      }
+      if (found) {
+        continue;
+      }
+
+      // Cannot extend the path even after rotating. This path is done.
+      paths.push_back(std::move(path));
+      break;
+    }
+  }
+  return paths;
+}
+
+std::optional<HamiltonPath> PathFinder::Extend_(
+    HamiltonPath path, std::set<Vertex>& to_visit) const {
+  // If the neighbor of the start or end vertex is not in the path, then we add
+  // it into the path. We check the end vertex first, due to the efficiency of
+  // inserting to the back over the front.
+  for (const auto& neighbor : adjacency_list_.at(path.back())) {
+    if (to_visit.find(neighbor) != to_visit.cend()) {
+      path.push_back(neighbor);
+      to_visit.erase(neighbor);
+      return path;
+    }
+  }
+  for (const auto& neighbor : adjacency_list_.at(path.front())) {
+    if (to_visit.find(neighbor) != to_visit.cend()) {
+      path.insert(path.cbegin(), neighbor);
+      to_visit.erase(neighbor);
+      return path;
+    }
+  }
+  return std::nullopt;
+}
+
+std::vector<HamiltonPath> PathFinder::Rotate_(const HamiltonPath& path) const {
+  if (path.size() <= 2) {
+    return {};
+  }
+  std::cout << "=== Rotating ===" << std::endl;
+  std::cout << "original: " << std::endl;
+  for (const auto& [p, n] : path) {
+    std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
+  }
+  auto rotated_paths = std::vector<HamiltonPath>{};
+  // If the start or end vertex has a short cut to the vertex in the middle of
+  // the path, that vertex becomes the new end or start vertex, respectively.
+  // NOTE: The rotation is actually a reverse.
+  for (auto i = std::size_t{2} /* skip the immediate neighbor */;
+       i < path.size(); i++) {
+    if (IsConnected(path.front(), path.at(i))) {
+      // Make a copy for the rotating.
+      auto rotated_path = path;
+      std::reverse(rotated_path.begin(), rotated_path.begin() + i);
+      std::cout << "left rotated: " << std::endl;
+      for (const auto& [p, n] : rotated_path) {
+        std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
+      }
+      rotated_paths.push_back(std::move(rotated_path));
+    }
+  }
+  for (auto i = std::size_t{0};
+       i < path.size() - 2 /* skip the immediate neighbor */; i++) {
+    if (IsConnected(path.back(), path.at(i))) {
+      auto rotated_path = path;
+      // The path is broke from the left neighbor of the vertex at i.
+      std::reverse(rotated_path.begin() + i + 1, rotated_path.end());
+      std::cout << "right rotated: " << std::endl;
+      for (const auto& [p, n] : rotated_path) {
+        std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
+      }
+      rotated_paths.push_back(std::move(rotated_path));
+    }
+  }
+  return rotated_paths;
 }
 
 namespace {
+
+bool IsConnected(const Vertex& a, const Vertex& b) {
+  return IsConnected(*a.first, *b.first) && IsConnected(*a.second, *b.second);
+}
 
 bool IsConnected(const Mos& a, const Mos& b) {
   return a.GetDrain() == b.GetDrain() || a.GetGate() == b.GetGate()
@@ -216,97 +304,12 @@ bool IsConnected(const Mos& a, const Mos& b) {
          || a.GetSubstrate() == b.GetSubstrate();
 }
 
-std::size_t DegreeOf(const Vertex& vertex, const Graph& graph) {
-  return graph.at(vertex).size();
-}
-
-std::vector<EulerPath> FindEulerPathOfSubgraphs(
-    std::vector<std::set<Vertex>> vertices, Graph& graph) {
-  auto paths = std::vector<EulerPath>{};
-  std::cout << "Number of subgraphs: " << vertices.size() << std::endl;
-  for (const auto& connected_subgraph : vertices) {
-    paths.push_back(FindEulerPathOfSubgraph(connected_subgraph, graph));
-  }
-  return paths;
-}
-
-EulerPath FindEulerPathOfSubgraph(std::set<Vertex> vertices, Graph& graph) {
-  // Hierholzer's algorithm
-  auto path = EulerPath{};
-  auto stack = std::vector<Vertex>{};
-  auto current = *vertices.begin();
-  while (!vertices.empty()) {
-    if (DegreeOf(current, graph) == 0) {
-      // If the current vertex has no neighbor, then it is the end of a path.
-      // We add it to the path and remove it from the graph.
-      path.push_back(current);
-      vertices.erase(current);
-      if (stack.empty()) {
-        // If the stack is empty, then we have found a path.
-        break;
-      }
-      current = stack.back();
-      stack.pop_back();
-    } else {
-      // If the current vertex has neighbor, then we add it to the stack and go
-      // to the neighbor.
-      stack.push_back(current);
-      // Remove such neighbor from the graph to ensure that we do not visit it
-      // again.
-      // NOTE: This is destructive to the graph.
-      auto next_current = graph.at(current).back();
-      // Since this is a undirected graph, the edge has to be removed from the
-      // list of both vertices.
-      graph.at(current).pop_back();
-      std::remove_if(
-          graph.at(next_current).begin(), graph.at(next_current).end(),
-          [&current](const auto& neighbor) { return neighbor == current; });
-      current = next_current;
-    }
-  }
-  assert(std::all_of(graph.cbegin(), graph.cend(),
-                     [](const auto& vertex_neighbors) {
-                       return vertex_neighbors.second.empty();
-                     })
-         && "The sub graph should be fully connected.");
-
-  return path;
-}
-
-std::vector<std::set<Vertex>> FindConnectedSubgraphs(const Graph& graph) {
-  auto visited = std::set<Vertex>{};
-  auto connected_subgraphs = std::vector<std::set<Vertex>>{};
-  for (const auto& [vertex, neighbors] : graph) {
-    if (visited.find(vertex) != visited.cend()) {
-      continue;
-    }
-    auto connected_subgraph = std::set<Vertex>{};
-    auto stack = std::vector<Vertex>{vertex};
-    while (!stack.empty()) {
-      auto current = stack.back();
-      stack.pop_back();
-      if (visited.find(current) != visited.end()) {
-        continue;
-      }
-      visited.insert(current);
-      connected_subgraph.insert(current);
-      for (const auto& neighbor : graph.at(current)) {
-        stack.push_back(neighbor);
-      }
-    }
-    std::cout << "Connected subgraph size: " << connected_subgraph.size()
-              << std::endl;
-    connected_subgraphs.push_back(connected_subgraph);
-  }
-  return connected_subgraphs;
-}
-
-EulerPath ConnectEulerPathOfSubgraphsWithDummy(
-    const std::vector<EulerPath>& paths) {
+HamiltonPath ConnectHamiltonPathOfSubgraphsWithDummy(
+    const std::vector<HamiltonPath>& paths) {
   if (paths.size() == 1) {
     return paths.front();
   }
-  auto path = EulerPath{paths.front()};
+  auto path = HamiltonPath{paths.front()};
   for (auto i = std::size_t{1}; i < paths.size(); i++) {
     // Get the net that is free (not already used as an edge) to be connected
     // with the dummy.
@@ -366,6 +369,8 @@ Edge FindEdgeOfTwoNeighborVertices(const Vertex& a, const Vertex& b) {
   std::set_intersection(nets_of_a.second.cbegin(), nets_of_a.second.cend(),
                         nets_of_b.second.cbegin(), nets_of_b.second.cend(),
                         std::back_inserter(n_mos_intersection));
+  assert(!p_mos_intersection.empty() && !n_mos_intersection.empty()
+         && "The 2 vertices should have at least one common net.");
   std::cout << a.first->GetName() << " " << b.first->GetName() << std::endl;
   for (const auto& net : p_mos_intersection) {
     std::cout << "P MOS intersection: " << net->GetName() << std::endl;
@@ -377,7 +382,7 @@ Edge FindEdgeOfTwoNeighborVertices(const Vertex& a, const Vertex& b) {
   return {p_mos_intersection.front(), n_mos_intersection.front()};
 }
 
-Edge FindFreeNetOfStartingVertex(const EulerPath& path) {
+Edge FindFreeNetOfStartingVertex(const HamiltonPath& path) {
   auto free_net = Edge{};
   auto starting_vertex = path.begin();
   auto connection = std::make_pair<std::shared_ptr<Net>, std::shared_ptr<Net>>(
@@ -401,7 +406,7 @@ Edge FindFreeNetOfStartingVertex(const EulerPath& path) {
   return free_net;
 }
 
-Edge FindFreeNetOfEndingVertex(const EulerPath& path) {
+Edge FindFreeNetOfEndingVertex(const HamiltonPath& path) {
   auto free_net = Edge{};
   auto ending_vertex = std::prev(path.end());
   auto connection = std::make_pair<std::shared_ptr<Net>, std::shared_ptr<Net>>(
@@ -425,7 +430,7 @@ Edge FindFreeNetOfEndingVertex(const EulerPath& path) {
   return free_net;
 }
 
-std::vector<Edge> GetEdgesOf(const EulerPath& path) {
+std::vector<Edge> GetEdgesOf(const HamiltonPath& path) {
   auto edges = std::vector<Edge>{};
   edges.push_back(FindFreeNetOfStartingVertex(path));
   for (auto i = std::size_t{1}; i < path.size(); i++) {

@@ -3,6 +3,8 @@
 
 #include <map>
 #include <memory>
+#include <optional>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -15,28 +17,45 @@ struct Net;
 using Vertex = std::pair<std::shared_ptr<Mos>, std::shared_ptr<Mos>>;
 using Edge = std::pair<std::shared_ptr<Net>, std::shared_ptr<Net>>;
 using Neighbors = std::vector<Vertex>;
-using EulerPath = std::vector<Vertex>;
+using HamiltonPath = std::vector<Vertex>;
 using Graph = std::map<Vertex, Neighbors>;
 
 class PathFinder {
  public:
   /// @details In addressing the path finder problem, the objective is to
-  /// identify an Euler path for both P MOS transistors and N MOS transistors.
-  /// It is imperative that the paths for these two types of MOS transistors are
-  /// identical. To achieve this, we form pairs by grouping a P MOS transistor
-  /// with a corresponding N MOS transistor, based on the commonality of their
-  /// connections, and subsequently seek an Euler path for each pair.
-  void FindPath() const;
+  /// identify an Hamilton path for both P MOS transistors and N MOS
+  /// transistors. It is imperative that the paths for these two types of MOS
+  /// transistors are identical. To achieve this, we form pairs by grouping a P
+  /// MOS transistor with a corresponding N MOS transistor, based on the
+  /// commonality of their connections, and subsequently seek an Hamilton path
+  /// for each pair.
+  void FindPath();
 
   PathFinder(const std::shared_ptr<Circuit>& circuit) : circuit_{circuit} {}
 
  private:
   const std::shared_ptr<Circuit>& circuit_;
 
-  std::vector<Vertex> GroupMosPairs_() const;
+  std::map<Vertex, Neighbors> adjacency_list_;
+  std::vector<Vertex> vertices_;
 
-  // O(v^2)
-  Graph BuildGraph_() const;
+  void GroupVertices_();
+  void BuildGraph_();
+
+  /// @return The Hamiltonian paths for the graph. The graph may not form a
+  /// single path.
+  /// @note Our requirement is to only visit each vertex once, while the edges
+  /// can be traversed multiple times. This is then in fact a Hamiltonian path
+  /// problem: https://en.wikipedia.org/wiki/Hamiltonian_path.
+  /// @details Here I'll be using a heuristic algorithm described in the
+  /// post: https://mathoverflow.net/a/327893.
+  std::vector<HamiltonPath> FindHamiltonPaths_();
+
+  /// @return The extended Hamiltonian path, if any.
+  std::optional<HamiltonPath> Extend_(HamiltonPath path,
+                                      std::set<Vertex>& to_visit) const;
+  /// @return The family of the Posa transformations of the given path.
+  std::vector<HamiltonPath> Rotate_(const HamiltonPath& path) const;
 };
 
 }  // namespace euler
