@@ -150,8 +150,11 @@ std::vector<Vertex> PathFinder::GroupMosPairs_() const {
     // common connection, then they are paired.
     for (const auto& n : n_mos_with_same_gate) {
       for (const auto& p : p_mos_with_same_gate) {
-        if (p->GetDrain() == n->GetDrain() || p->GetSource() == n->GetSource()
-            || p->GetSubstrate() == n->GetSubstrate()) {
+        // NOTE: The connection of substrate doesn't count since all P MOS
+        // usually all connect their substrate to the same point. So are the N
+        // MOS.
+        if (p->GetDrain() == n->GetDrain()
+            || p->GetSource() == n->GetSource()) {
           mos_pairs.emplace_back(p, n);
           remaining_p_mos.erase(
               std::find_if(remaining_p_mos.begin(), remaining_p_mos.end(),
@@ -428,8 +431,10 @@ std::vector<Edge> GetEdgesOf(const EulerPath& path) {
 }
 
 std::set<std::shared_ptr<Net>> NetsOf(const Mos& mos) {
+  // NOTE: The connection of substrate doesn't count since all P MOS usually all
+  // connect their substrate to the same point. So are the N MOS.
   return std::set<std::shared_ptr<Net>>{mos.GetDrain(), mos.GetGate(),
-                                        mos.GetSource(), mos.GetSubstrate()};
+                                        mos.GetSource()};
 }
 
 }  // namespace
