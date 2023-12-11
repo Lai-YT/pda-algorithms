@@ -255,7 +255,12 @@ EulerPath FindEulerPathOfSubgraph(std::set<Vertex> vertices, Graph& graph) {
       // again.
       // NOTE: This is destructive to the graph.
       auto next_current = graph.at(current).back();
+      // Since this is a undirected graph, the edge has to be removed from the
+      // list of both vertices.
       graph.at(current).pop_back();
+      std::remove_if(
+          graph.at(next_current).begin(), graph.at(next_current).end(),
+          [&current](const auto& neighbor) { return neighbor == current; });
       current = next_current;
     }
   }
