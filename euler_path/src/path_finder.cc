@@ -56,7 +56,8 @@ Edge FindFreeNetOfStartingVertex(const HamiltonPath&);
 // nets, we choose the one that is discovered first.
 Edge FindFreeNetOfEndingVertex(const HamiltonPath&);
 
-/// @return The nets that connect the MOS in the Hamilton path.
+/// @return The nets that connect the MOS in the Hamilton path, including the
+/// gate connections of the MOS.
 std::vector<Edge> GetEdgesOf(const HamiltonPath&);
 
 std::set<std::shared_ptr<Net>> NetsOf(const Mos&);
@@ -300,8 +301,7 @@ bool IsConnected(const Vertex& a, const Vertex& b) {
 
 bool IsConnected(const Mos& a, const Mos& b) {
   return a.GetDrain() == b.GetDrain() || a.GetGate() == b.GetGate()
-         || a.GetSource() == b.GetSource()
-         || a.GetSubstrate() == b.GetSubstrate();
+         || a.GetSource() == b.GetSource();
 }
 
 HamiltonPath ConnectHamiltonPathOfSubgraphsWithDummy(
@@ -429,8 +429,12 @@ Edge FindFreeNetOfEndingVertex(const HamiltonPath& path) {
 std::vector<Edge> GetEdgesOf(const HamiltonPath& path) {
   auto edges = std::vector<Edge>{};
   edges.push_back(FindFreeNetOfStartingVertex(path));
+  edges.emplace_back(path.front().first->GetGate(),
+                     path.front().second->GetGate());
   for (auto i = std::size_t{1}; i < path.size(); i++) {
     edges.push_back(FindEdgeOfTwoNeighborVertices(path.at(i - 1), path.at(i)));
+    edges.emplace_back(path.at(i).first->GetGate(),
+                       path.at(i).second->GetGate());
   }
   edges.push_back(FindFreeNetOfEndingVertex(path));
   return edges;
