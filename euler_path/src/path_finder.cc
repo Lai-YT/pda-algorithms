@@ -317,18 +317,23 @@ HamiltonPath ConnectHamiltonPathOfSubgraphsWithDummy(
     auto dummy_net = std::make_shared<Net>("Dummy");
     auto ending_vertex = path.back();
     auto ending_free_net = FindFreeNetOfEndingVertex(path);
-    auto ending_dummy
-        = Vertex{Mos::Create("Dummy", Mos::Type::kP, ending_free_net.first,
-                             dummy_net, dummy_net, dummy_net),
-                 Mos::Create("Dummy", Mos::Type::kN, ending_free_net.second,
-                             dummy_net, dummy_net, dummy_net)};
+    // The size of the dummy is the same as the MOS next to it.
+    auto ending_dummy = Vertex{
+        Mos::Create("Dummy", Mos::Type::kP, ending_free_net.first, dummy_net,
+                    dummy_net, dummy_net, ending_vertex.first->GetWidth(),
+                    ending_vertex.first->GetLength()),
+        Mos::Create("Dummy", Mos::Type::kN, ending_free_net.second, dummy_net,
+                    dummy_net, dummy_net, ending_vertex.second->GetWidth(),
+                    ending_vertex.second->GetLength())};
     auto starting_vertex = paths.at(i).front();
     auto starting_free_net = FindFreeNetOfStartingVertex(paths.at(i));
-    auto starting_dummy
-        = Vertex{Mos::Create("Dummy", Mos::Type::kP, starting_free_net.first,
-                             dummy_net, dummy_net, dummy_net),
-                 Mos::Create("Dummy", Mos::Type::kN, starting_free_net.second,
-                             dummy_net, dummy_net, dummy_net)};
+    auto starting_dummy = Vertex{
+        Mos::Create("Dummy", Mos::Type::kP, starting_free_net.first, dummy_net,
+                    dummy_net, dummy_net, starting_vertex.first->GetWidth(),
+                    starting_vertex.first->GetLength()),
+        Mos::Create("Dummy", Mos::Type::kN, starting_free_net.second, dummy_net,
+                    dummy_net, dummy_net, starting_vertex.second->GetWidth(),
+                    starting_vertex.second->GetLength())};
     path.push_back(ending_dummy);
     path.push_back(starting_dummy);
     path.insert(path.cend(), paths.at(i).cbegin(), paths.at(i).cend());

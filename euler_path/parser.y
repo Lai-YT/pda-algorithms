@@ -104,7 +104,7 @@ mos:
     auto instance_name = ($1).substr(1);  // Remove the leading 'M'.
     $$ = euler::Mos::Create(instance_name, /* type */ $6, GetOrCreateNet($2),
                             GetOrCreateNet($3), GetOrCreateNet($4),
-                            GetOrCreateNet($5));
+                            GetOrCreateNet($5), $9, $13);
     $$->RegisterToConnections();
   }
   ;

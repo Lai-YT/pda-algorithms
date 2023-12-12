@@ -17,17 +17,20 @@ std::shared_ptr<Mos> Mos::Create(std::string name, Type type,
                                  std::shared_ptr<Net> drain,
                                  std::shared_ptr<Net> gate,
                                  std::shared_ptr<Net> source,
-                                 std::shared_ptr<Net> substrate) {
-  return std::shared_ptr<Mos>{
-      new Mos{std::move(name), type, drain, gate, source, substrate}};
+                                 std::shared_ptr<Net> substrate, double width,
+                                 double length) {
+  return std::shared_ptr<Mos>{new Mos{std::move(name), type, drain, gate,
+                                      source, substrate, width, length}};
 }
 
 Mos::Mos(std::string name, Type type, std::shared_ptr<Net> drain,
          std::shared_ptr<Net> gate, std::shared_ptr<Net> source,
-         std::shared_ptr<Net> substrate)
+         std::shared_ptr<Net> substrate, double width, double length)
     : name_{std::move(name)},
       type_{type},
       drain_{drain},
       gate_{gate},
       source_{source},
-      substrate_{substrate} {}
+      substrate_{substrate},
+      width_{width},
+      length_{length} {}

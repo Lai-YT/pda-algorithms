@@ -24,7 +24,8 @@ class Mos : public std::enable_shared_from_this<Mos> {
                                      std::shared_ptr<Net> drain,
                                      std::shared_ptr<Net> gate,
                                      std::shared_ptr<Net> source,
-                                     std::shared_ptr<Net> substrate);
+                                     std::shared_ptr<Net> substrate,
+                                     double width, double length);
 
   std::string GetName() const {
     return name_;
@@ -50,6 +51,14 @@ class Mos : public std::enable_shared_from_this<Mos> {
     return substrate_;
   }
 
+  double GetWidth() const {
+    return width_;
+  }
+
+  double GetLength() const {
+    return length_;
+  }
+
  private:
   std::string name_;
   Type type_;
@@ -57,10 +66,12 @@ class Mos : public std::enable_shared_from_this<Mos> {
   std::shared_ptr<Net> gate_;
   std::shared_ptr<Net> source_;
   std::shared_ptr<Net> substrate_;
+  double width_;
+  double length_;
 
   Mos(std::string name, Type type, std::shared_ptr<Net> drain,
       std::shared_ptr<Net> gate, std::shared_ptr<Net> source,
-      std::shared_ptr<Net> substrate);
+      std::shared_ptr<Net> substrate, double width, double length);
 };
 
 }  // namespace euler
