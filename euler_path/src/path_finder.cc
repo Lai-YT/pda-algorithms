@@ -300,8 +300,13 @@ bool IsConnected(const Vertex& a, const Vertex& b) {
 }
 
 bool IsConnected(const Mos& a, const Mos& b) {
-  return a.GetDrain() == b.GetDrain() || a.GetGate() == b.GetGate()
-         || a.GetSource() == b.GetSource();
+  auto nets_of_a = NetsOf(a);
+  auto nets_of_b = NetsOf(b);
+  auto intersection = std::vector<std::shared_ptr<Net>>{};
+  std::set_intersection(nets_of_a.cbegin(), nets_of_a.cend(),
+                        nets_of_b.cbegin(), nets_of_b.cend(),
+                        std::back_inserter(intersection));
+  return !intersection.empty();
 }
 
 HamiltonPath ConnectHamiltonPathOfSubgraphsWithDummy(
