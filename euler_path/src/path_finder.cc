@@ -314,25 +314,21 @@ HamiltonPath ConnectHamiltonPathOfSubgraphsWithDummy(
     // Get the net that is free (not already used as an edge) to be connected
     // with the dummy.
     // The 2 dummies are connected with the dummy net.
-    auto dummy_net = std::make_pair(std::make_shared<Net>("Dummy"),
-                                    std::make_shared<Net>("Dummy"));
+    auto dummy_net = std::make_shared<Net>("Dummy");
     auto ending_vertex = path.back();
     auto ending_free_net = FindFreeNetOfEndingVertex(path);
-    auto gate_of_ending_dummy = std::make_shared<Net>("Dummy");
-    auto ending_dummy = Vertex{
-        Mos::Create("Dummy", Mos::Type::kP, ending_free_net.first,
-                    gate_of_ending_dummy, dummy_net.first, dummy_net.first),
-        Mos::Create("Dummy", Mos::Type::kN, ending_free_net.second,
-                    gate_of_ending_dummy, dummy_net.second, dummy_net.second)};
+    auto ending_dummy
+        = Vertex{Mos::Create("Dummy", Mos::Type::kP, ending_free_net.first,
+                             dummy_net, dummy_net, dummy_net),
+                 Mos::Create("Dummy", Mos::Type::kN, ending_free_net.second,
+                             dummy_net, dummy_net, dummy_net)};
     auto starting_vertex = paths.at(i).front();
     auto starting_free_net = FindFreeNetOfStartingVertex(paths.at(i));
-    auto gate_of_starting_dummy = std::make_shared<Net>("Dummy");
-    auto starting_dummy = Vertex{
-        Mos::Create("Dummy", Mos::Type::kP, starting_free_net.first,
-                    gate_of_starting_dummy, dummy_net.first, dummy_net.first),
-        Mos::Create("Dummy", Mos::Type::kN, starting_free_net.second,
-                    gate_of_starting_dummy, dummy_net.second,
-                    dummy_net.second)};
+    auto starting_dummy
+        = Vertex{Mos::Create("Dummy", Mos::Type::kP, starting_free_net.first,
+                             dummy_net, dummy_net, dummy_net),
+                 Mos::Create("Dummy", Mos::Type::kN, starting_free_net.second,
+                             dummy_net, dummy_net, dummy_net)};
     path.push_back(ending_dummy);
     path.push_back(starting_dummy);
     path.insert(path.cend(), paths.at(i).cbegin(), paths.at(i).cend());
