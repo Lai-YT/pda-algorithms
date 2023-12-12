@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -29,7 +30,9 @@ class PathFinder {
   /// MOS transistor with a corresponding N MOS transistor, based on the
   /// commonality of their connections, and subsequently seek an Hamilton path
   /// for each pair.
-  void FindPath();
+  /// @return The Hamiltonian path of the MOS, the corresponding net connection,
+  /// and the HPWL.
+  std::tuple<HamiltonPath, std::vector<Edge>, double> FindPath();
 
   PathFinder(const std::shared_ptr<Circuit>& circuit) : circuit_{circuit} {}
 
@@ -50,6 +53,7 @@ class PathFinder {
   /// @details Here I'll be using a heuristic algorithm described in the
   /// post: https://mathoverflow.net/a/327893.
   std::vector<HamiltonPath> FindHamiltonPaths_();
+  double CalculateHpwl_(const HamiltonPath& path) const;
 
   /// @return The extended Hamiltonian path, if any.
   std::optional<HamiltonPath> Extend_(HamiltonPath path,

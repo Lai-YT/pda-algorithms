@@ -2,6 +2,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -44,7 +45,18 @@ int main(int argc, char const* argv[]) {
   }
 
   auto path_finder = PathFinder{circuit};
-  path_finder.FindPath();
+  auto [path, edges, hpwl] = path_finder.FindPath();
+
+  std::cout << "=== Connect Path ===" << std::endl;
+  for (const auto& [p, n] : path) {
+    std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
+  }
+  std::cout << "=== Corresponding Net ===" << std::endl;
+  for (const auto& [p, n] : edges) {
+    std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
+  }
+  std::cout << "=== HPWL ===" << std::endl;
+  std::cout << hpwl << std::endl;
 
   return 0;
 }

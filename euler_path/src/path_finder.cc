@@ -60,11 +60,23 @@ Edge FindFreeNetOfEndingVertex(const HamiltonPath&);
 /// gate connections of the MOS.
 std::vector<Edge> GetEdgesOf(const HamiltonPath&);
 
+/// @note For HPWL calculation, we need to know the Hamilton distance between
+/// true nets. This makes the existence of gate a noise. So we exclude the gate.
+std::vector<Edge> GetEdgesWithGateExcludedOf(const HamiltonPath& path);
+
 std::set<std::shared_ptr<Net>> NetsOf(const Mos&);
+
+std::size_t MaxNetIdx(const std::vector<std::size_t>& idx) {
+  return *std::max_element(idx.cbegin(), idx.cend());
+}
+
+std::size_t MinNetIdx(const std::vector<std::size_t>& idx) {
+  return *std::min_element(idx.cbegin(), idx.cend());
+}
 
 }  // namespace
 
-void PathFinder::FindPath() {
+std::tuple<HamiltonPath, std::vector<Edge>, double> PathFinder::FindPath() {
   GroupVertices_();
   BuildGraph_();
 
@@ -89,16 +101,7 @@ void PathFinder::FindPath() {
   }
 
   auto path = ConnectHamiltonPathOfSubgraphsWithDummy(paths);
-  auto edges = GetEdgesOf(path);
-
-  std::cout << "=== Connect Path ===" << std::endl;
-  for (const auto& [p, n] : path) {
-    std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
-  }
-  std::cout << "=== Corresponding Net ===" << std::endl;
-  for (const auto& [p, n] : edges) {
-    std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
-  }
+  return {path, GetEdgesOf(path), CalculateHpwl_(path)};
 }
 
 void PathFinder::GroupVertices_() {
@@ -270,10 +273,6 @@ std::vector<HamiltonPath> PathFinder::Rotate_(const HamiltonPath& path) const {
       // Make a copy for the rotating.
       auto rotated_path = path;
       std::reverse(rotated_path.begin(), rotated_path.begin() + i);
-      std::cout << "left rotated: " << std::endl;
-      for (const auto& [p, n] : rotated_path) {
-        std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
-      }
       rotated_paths.push_back(std::move(rotated_path));
     }
   }
@@ -283,14 +282,130 @@ std::vector<HamiltonPath> PathFinder::Rotate_(const HamiltonPath& path) const {
       auto rotated_path = path;
       // The path is broke from the left neighbor of the vertex at i.
       std::reverse(rotated_path.begin() + i + 1, rotated_path.end());
-      std::cout << "right rotated: " << std::endl;
-      for (const auto& [p, n] : rotated_path) {
-        std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
-      }
       rotated_paths.push_back(std::move(rotated_path));
     }
   }
   return rotated_paths;
+}
+
+double PathFinder::CalculateHpwl_(const HamiltonPath& path) const {
+  // Design rule parameters.
+  constexpr auto kVerticalWidthIncrement = 27.0;
+  constexpr auto kHorizontalExtension = 25.0;
+  constexpr auto kGateSpacing = 34.0;
+  constexpr auto kHorizontalGateWidth = 20.0;
+  constexpr auto kUnitHorizontalWidth = kGateSpacing + kHorizontalGateWidth;
+
+  auto net_order = GetEdgesWithGateExcludedOf(path);
+  auto nets = std::vector<std::shared_ptr<Net>>{};
+  for (const auto& [_, net] : circuit_->nets) {
+    nets.push_back(net);
+  }
+  auto hpwl = 0.0;
+  // For each net (excluding dummy nets not connected to any MOS other than the
+  // dummy MOS), we determine the maximum wire length in the path of the P-type
+  // MOS and the N-type MOS. If both types contain such paths connected by this
+  // net, we add a vertical length, as the net has to cross both types of MOS.
+  // If only one type of MOS contains such a path, but the other type has the
+  // net at a single point, we also need to add a vertical length.
+  // If both types have the net at a single point, we don't need to calculate
+  // the wire length by their Hamilton distance.
+  // NOTE: The width of the MOS are said to be consistent among the
+  // same type and the length are all the same. So we can just use the first
+  // one.
+  const auto width_of_p_mos = path.front().first->GetWidth();
+  const auto width_of_n_mos = path.front().second->GetWidth();
+  [[maybe_unused]] const auto length_of_mos = path.front().first->GetLength();
+  const auto vertical_wire_length
+      = kVerticalWidthIncrement + (width_of_p_mos + width_of_n_mos) / 2;
+  for (auto net : nets) {
+    auto idx_in_p = std::vector<std::size_t>{};
+    auto idx_in_n = std::vector<std::size_t>{};
+    for (auto i = std::size_t{0}; i < net_order.size(); i++) {
+      if (net_order.at(i).first == net) {
+        idx_in_p.push_back(i);
+      }
+      if (net_order.at(i).second == net) {
+        idx_in_n.push_back(i);
+      }
+    }
+    std::cout << "=== Idx of " << net->GetName() << " ===" << std::endl;
+    std::cout << "P MOS: ";
+    for (const auto& idx : idx_in_p) {
+      std::cout << idx << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "N MOS: ";
+    for (const auto& idx : idx_in_n) {
+      std::cout << idx << " ";
+    }
+    std::cout << std::endl;
+    // If any of the net is at the end of the path, we need to use the
+    // extension width instead of a normal gate spacing.
+    auto adjustment = 0.0;
+    // (1) both P and N MOS have the net at a single point.
+    if (idx_in_p.size() == 1 && idx_in_n.size() == 1) {
+      // Treat them as in the same type + vertical wire length.
+      hpwl += kUnitHorizontalWidth
+                  * (std::max(idx_in_p.front(), idx_in_n.front())
+                     - std::min(idx_in_p.front(), idx_in_n.front()))
+              + vertical_wire_length;
+      adjustment = (std::max(idx_in_p.front(), idx_in_n.front())
+                    == net_order.size() - 1)
+                   + (std::min(idx_in_p.front(), idx_in_n.front()) == 0);
+    } else if (idx_in_p.size() > 1 && idx_in_n.size() == 1) {
+      // (2) P MOS has the net at multiple points, but N MOS has the net at a
+      // single point. Treat them as all in the P type + vertical wire length.
+      auto augmented_idx_in_p = idx_in_p;
+      augmented_idx_in_p.push_back(idx_in_n.front());
+      hpwl += kUnitHorizontalWidth
+                  * (MaxNetIdx(augmented_idx_in_p)
+                     - MinNetIdx(augmented_idx_in_p))
+              + vertical_wire_length;
+      adjustment = (MaxNetIdx(augmented_idx_in_p) == net_order.size() - 1)
+                   + (MinNetIdx(augmented_idx_in_p) == 0);
+    } else if (idx_in_p.size() == 1 && idx_in_n.size() > 1) {
+      // (3) P MOS has the net at a single point, but N MOS has the net at
+      // multiple points. Treat them as all in the N type + vertical wire
+      // length.
+      auto augmented_idx_in_n = idx_in_n;
+      augmented_idx_in_n.push_back(idx_in_p.front());
+      hpwl += kUnitHorizontalWidth
+                  * (MaxNetIdx(augmented_idx_in_n)
+                     - MinNetIdx(augmented_idx_in_n))
+              + vertical_wire_length;
+      adjustment = (MaxNetIdx(augmented_idx_in_n) == net_order.size() - 1)
+                   + (MinNetIdx(augmented_idx_in_n) == 0);
+    } else if (idx_in_p.size() > 1 && idx_in_n.size() > 1) {
+      // (4) Both P and N MOS have the net at multiple points. If these two path
+      // do overlap, we add up the wire length of the two paths + vertical wire
+      // length. If these two path do not overlap, we add up the wire length of
+      // the two paths + vertical wire length + wire length between the two
+      // paths.
+      hpwl += kUnitHorizontalWidth
+                  * (MaxNetIdx(idx_in_p) - MinNetIdx(idx_in_p)
+                     + MaxNetIdx(idx_in_n) - MinNetIdx(idx_in_n))
+              + vertical_wire_length;
+      if (MinNetIdx(idx_in_p) > MaxNetIdx(idx_in_n)) {
+        // Path in P type is after the path in N type.
+        hpwl += kUnitHorizontalWidth
+                * (MinNetIdx(idx_in_p) - MaxNetIdx(idx_in_n));
+      } else if (MinNetIdx(idx_in_n) > MaxNetIdx(idx_in_p)) {
+        // Path in N type is after the path in P type.
+        hpwl += kUnitHorizontalWidth
+                * (MinNetIdx(idx_in_n) - MaxNetIdx(idx_in_p));
+      }
+      adjustment = (MaxNetIdx(idx_in_p) == net_order.size() - 1)
+                   + (MinNetIdx(idx_in_p) == 0)
+                   + (MaxNetIdx(idx_in_n) == net_order.size() - 1)
+                   + (MinNetIdx(idx_in_n) == 0);
+    } else {
+      // Single point in a type. No wire length.
+      continue;
+    }
+    hpwl += (-kGateSpacing + kHorizontalExtension) / 2.0 * adjustment;
+  }
+  return hpwl;
 }
 
 namespace {
@@ -445,6 +560,16 @@ std::vector<Edge> GetEdgesOf(const HamiltonPath& path) {
     edges.push_back(FindEdgeOfTwoNeighborVertices(path.at(i - 1), path.at(i)));
     edges.emplace_back(path.at(i).first->GetGate(),
                        path.at(i).second->GetGate());
+  }
+  edges.push_back(FindFreeNetOfEndingVertex(path));
+  return edges;
+}
+
+std::vector<Edge> GetEdgesWithGateExcludedOf(const HamiltonPath& path) {
+  auto edges = std::vector<Edge>{};
+  edges.push_back(FindFreeNetOfStartingVertex(path));
+  for (auto i = std::size_t{1}; i < path.size(); i++) {
+    edges.push_back(FindEdgeOfTwoNeighborVertices(path.at(i - 1), path.at(i)));
   }
   edges.push_back(FindFreeNetOfEndingVertex(path));
   return edges;
