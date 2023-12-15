@@ -69,14 +69,6 @@ std::vector<Edge> GetEdgesWithGateExcludedOf(const HamiltonPath& path);
 
 std::set<std::shared_ptr<Net>> NetsOf(const Mos&);
 
-std::size_t MaxNetIdx(const std::vector<std::size_t>& idx) {
-  return *std::max_element(idx.cbegin(), idx.cend());
-}
-
-std::size_t MinNetIdx(const std::vector<std::size_t>& idx) {
-  return *std::min_element(idx.cbegin(), idx.cend());
-}
-
 }  // namespace
 
 std::tuple<HamiltonPath, std::vector<Edge>, double> PathFinder::FindPath() {
@@ -335,7 +327,9 @@ double PathFinder::CalculateHpwl_(const HamiltonPath& path) const {
   const auto vertical_wire_length
       = kVerticalWidthIncrement + (width_of_p_mos + width_of_n_mos) / 2;
   for (auto net : nets) {
+    /// @note The indices are sorted.
     auto idx_in_p = std::vector<std::size_t>{};
+    /// @note The indices are sorted.
     auto idx_in_n = std::vector<std::size_t>{};
     for (auto i = std::size_t{0}; i < net_order.size(); i++) {
       if (net_order.at(i).first == net) {
@@ -365,24 +359,25 @@ double PathFinder::CalculateHpwl_(const HamiltonPath& path) const {
     // (1) both P and N MOS have the net at a single point.
     if (idx_in_p.size() == 1 && idx_in_n.size() == 1) {
       // Treat them as in the same type + vertical wire length.
+      /// @note The indices are sorted.
+      auto augmented_idx
+          = decltype(idx_in_p){std::min(idx_in_p.front(), idx_in_n.front()),
+                               std::max(idx_in_p.front(), idx_in_n.front())};
       hpwl += kUnitHorizontalWidth
-                  * (std::max(idx_in_p.front(), idx_in_n.front())
-                     - std::min(idx_in_p.front(), idx_in_n.front()))
+                  * (augmented_idx.back() - augmented_idx.front())
               + vertical_wire_length;
-      adjustment = (std::max(idx_in_p.front(), idx_in_n.front())
-                    == net_order.size() - 1)
-                   + (std::min(idx_in_p.front(), idx_in_n.front()) == 0);
+      adjustment = (augmented_idx.back() == net_order.size() - 1)
+                   + (augmented_idx.front() == 0);
     } else if (idx_in_p.size() > 1 && idx_in_n.size() == 1) {
       // (2) P MOS has the net at multiple points, but N MOS has the net at a
       // single point. Treat them as all in the P type + vertical wire length.
       auto augmented_idx_in_p = idx_in_p;
       augmented_idx_in_p.push_back(idx_in_n.front());
       hpwl += kUnitHorizontalWidth
-                  * (MaxNetIdx(augmented_idx_in_p)
-                     - MinNetIdx(augmented_idx_in_p))
+                  * (augmented_idx_in_p.back() - augmented_idx_in_p.front())
               + vertical_wire_length;
-      adjustment = (MaxNetIdx(augmented_idx_in_p) == net_order.size() - 1)
-                   + (MinNetIdx(augmented_idx_in_p) == 0);
+      adjustment = (augmented_idx_in_p.back() == net_order.size() - 1)
+                   + (augmented_idx_in_p.front() == 0);
     } else if (idx_in_p.size() == 1 && idx_in_n.size() > 1) {
       // (3) P MOS has the net at a single point, but N MOS has the net at
       // multiple points. Treat them as all in the N type + vertical wire
@@ -390,11 +385,10 @@ double PathFinder::CalculateHpwl_(const HamiltonPath& path) const {
       auto augmented_idx_in_n = idx_in_n;
       augmented_idx_in_n.push_back(idx_in_p.front());
       hpwl += kUnitHorizontalWidth
-                  * (MaxNetIdx(augmented_idx_in_n)
-                     - MinNetIdx(augmented_idx_in_n))
+                  * (augmented_idx_in_n.back() - augmented_idx_in_n.front())
               + vertical_wire_length;
-      adjustment = (MaxNetIdx(augmented_idx_in_n) == net_order.size() - 1)
-                   + (MinNetIdx(augmented_idx_in_n) == 0);
+      adjustment = (augmented_idx_in_n.back() == net_order.size() - 1)
+                   + (augmented_idx_in_n.front() == 0);
     } else if (idx_in_p.size() > 1 && idx_in_n.size() > 1) {
       // (4) Both P and N MOS have the net at multiple points. If these two path
       // do overlap, we add up the wire length of the two paths + vertical wire
@@ -402,34 +396,30 @@ double PathFinder::CalculateHpwl_(const HamiltonPath& path) const {
       // the two paths + vertical wire length + wire length between the two
       // paths.
       hpwl += kUnitHorizontalWidth
-                  * (MaxNetIdx(idx_in_p) - MinNetIdx(idx_in_p)
-                     + MaxNetIdx(idx_in_n) - MinNetIdx(idx_in_n))
+                  * (idx_in_p.back() - idx_in_p.front() + idx_in_n.back()
+                     - idx_in_n.front())
               + vertical_wire_length;
-      if (MinNetIdx(idx_in_p) > MaxNetIdx(idx_in_n)) {
+      if (idx_in_p.front() > idx_in_n.back()) {
         // Path in P type is after the path in N type.
-        hpwl += kUnitHorizontalWidth
-                * (MinNetIdx(idx_in_p) - MaxNetIdx(idx_in_n));
-      } else if (MinNetIdx(idx_in_n) > MaxNetIdx(idx_in_p)) {
+        hpwl += kUnitHorizontalWidth * (idx_in_p.front() - idx_in_n.back());
+      } else if (idx_in_n.front() > idx_in_p.back()) {
         // Path in N type is after the path in P type.
-        hpwl += kUnitHorizontalWidth
-                * (MinNetIdx(idx_in_n) - MaxNetIdx(idx_in_p));
+        hpwl += kUnitHorizontalWidth * (idx_in_n.front() - idx_in_p.back());
       }
-      adjustment = (MaxNetIdx(idx_in_p) == net_order.size() - 1)
-                   + (MinNetIdx(idx_in_p) == 0)
-                   + (MaxNetIdx(idx_in_n) == net_order.size() - 1)
-                   + (MinNetIdx(idx_in_n) == 0);
+      adjustment = (idx_in_p.back() == net_order.size() - 1)
+                   + (idx_in_p.front() == 0)
+                   + (idx_in_n.back() == net_order.size() - 1)
+                   + (idx_in_n.front() == 0);
     } else if (idx_in_p.size() > 1 && idx_in_n.empty()) {
       // (5) Only P MOS has the net at multiple points. No vertical wire length.
-      hpwl
-          += kUnitHorizontalWidth * (MaxNetIdx(idx_in_p) - MinNetIdx(idx_in_p));
-      adjustment = (MaxNetIdx(idx_in_p) == net_order.size() - 1)
-                   + (MinNetIdx(idx_in_p) == 0);
+      hpwl += kUnitHorizontalWidth * (idx_in_p.back() - idx_in_p.front());
+      adjustment
+          = (idx_in_p.back() == net_order.size() - 1) + (idx_in_p.front() == 0);
     } else if (idx_in_p.empty() && idx_in_n.size() > 1) {
       // (6) Only N MOS has the net at multiple points. No vertical wire length.
-      hpwl
-          += kUnitHorizontalWidth * (MaxNetIdx(idx_in_n) - MinNetIdx(idx_in_n));
-      adjustment = (MaxNetIdx(idx_in_n) == net_order.size() - 1)
-                   + (MinNetIdx(idx_in_n) == 0);
+      hpwl += kUnitHorizontalWidth * (idx_in_n.back() - idx_in_n.front());
+      adjustment
+          = (idx_in_n.back() == net_order.size() - 1) + (idx_in_n.front() == 0);
     } else {
       // Single point in a type. No wire length.
       continue;
