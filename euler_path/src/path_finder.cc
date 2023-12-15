@@ -80,25 +80,29 @@ std::tuple<HamiltonPath, std::vector<Edge>, double> PathFinder::FindPath() {
   GroupVertices_();
   BuildGraph_();
 
-  // Find a path to go through all the vertices once.
-  std::cout << "=== Graph ===" << std::endl;
+#ifdef DEBUG
+  std::cerr << "=== Graph ===" << std::endl;
   for (const auto& vertex : vertices_) {
-    std::cout << vertex.first->GetName() << " " << vertex.second->GetName()
+    std::cerr << vertex.first->GetName() << " " << vertex.second->GetName()
               << std::endl;
     for (const auto& neighbor : adjacency_list_.at(vertex)) {
-      std::cout << "  " << neighbor.first->GetName() << " "
+      std::cerr << "  " << neighbor.first->GetName() << " "
                 << neighbor.second->GetName() << std::endl;
     }
   }
+#endif
 
   auto paths = FindHamiltonPaths_();
-  std::cout << "=== Paths ===" << std::endl;
+
+#ifdef DEBUG
+  std::cerr << "=== Paths ===" << std::endl;
   for (const auto& path : paths) {
     for (const auto& [p, n] : path) {
-      std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
+      std::cerr << p->GetName() << "\t" << n->GetName() << std::endl;
     }
-    std::cout << "@@@" << std::endl;
+    std::cerr << "@@@" << std::endl;
   }
+#endif
 
   auto path = ConnectHamiltonPathOfSubgraphsWithDummy(paths);
   return {path, GetEdgesOf(path), CalculateHpwl_(path)};
@@ -155,12 +159,15 @@ void PathFinder::GroupVertices_() {
         }
       }
     }
+
+#ifdef DEBUG
     for (const auto& p : remaining_p_mos) {
-      std::cout << "Remaining P MOS: " << p->GetName() << std::endl;
+      std::cerr << "Remaining P MOS: " << p->GetName() << std::endl;
     }
     for (const auto& n : remaining_n_mos) {
-      std::cout << "Remaining N MOS: " << n->GetName() << std::endl;
+      std::cerr << "Remaining N MOS: " << n->GetName() << std::endl;
     }
+#endif
 
     // While sometime multiple P and N MOS share only the gate. In such case, we
     // can pair them in any way.
@@ -170,10 +177,12 @@ void PathFinder::GroupVertices_() {
     }
   }
 
-  std::cout << "=== MOS pairs ===" << std::endl;
+#ifdef DEBUG
+  std::cerr << "=== MOS pairs ===" << std::endl;
   for (const auto& [p, n] : vertices_) {
-    std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
+    std::cerr << p->GetName() << "\t" << n->GetName() << std::endl;
   }
+#endif
 }
 
 void PathFinder::BuildGraph_() {
@@ -258,11 +267,15 @@ std::vector<HamiltonPath> PathFinder::Rotate_(const HamiltonPath& path) const {
   if (path.size() <= 2) {
     return {};
   }
-  std::cout << "=== Rotating ===" << std::endl;
-  std::cout << "original: " << std::endl;
+
+#ifdef DEBUG
+  std::cerr << "=== Rotating ===" << std::endl;
+  std::cerr << "original: " << std::endl;
   for (const auto& [p, n] : path) {
-    std::cout << p->GetName() << "\t" << n->GetName() << std::endl;
+    std::cerr << p->GetName() << "\t" << n->GetName() << std::endl;
   }
+#endif
+
   auto rotated_paths = std::vector<HamiltonPath>{};
   // If the start or end vertex has a short cut to the vertex in the middle of
   // the path, that vertex becomes the new end or start vertex, respectively.
@@ -329,17 +342,20 @@ double PathFinder::CalculateHpwl_(const HamiltonPath& path) const {
         idx_in_n.push_back(i);
       }
     }
-    std::cout << "=== Idx of " << net->GetName() << " ===" << std::endl;
-    std::cout << "P MOS: ";
+
+#ifdef DEBUG
+    std::cerr << "=== Idx of " << net->GetName() << " ===" << std::endl;
+    std::cerr << "P MOS: ";
     for (const auto& idx : idx_in_p) {
-      std::cout << idx << " ";
+      std::cerr << idx << " ";
     }
-    std::cout << std::endl;
-    std::cout << "N MOS: ";
+    std::cerr << std::endl;
+    std::cerr << "N MOS: ";
     for (const auto& idx : idx_in_n) {
-      std::cout << idx << " ";
+      std::cerr << idx << " ";
     }
-    std::cout << std::endl;
+    std::cerr << std::endl;
+#endif
     // If any of the net is at the end of the path, we need to use the
     // extension width instead of a normal gate spacing.
     auto adjustment = 0.0;
@@ -464,24 +480,28 @@ HamiltonPath ConnectHamiltonPathOfSubgraphsWithDummy(
 Edge FindEdgeOfTwoNeighborVertices(const Vertex& a, const Vertex& b) {
   auto nets_of_a = std::make_pair(NetsOf(*a.first), NetsOf(*a.second));
   auto nets_of_b = std::make_pair(NetsOf(*b.first), NetsOf(*b.second));
-  std::cout << "=== P MOS ===" << std::endl;
+
+#ifdef DEBUG
+  std::cerr << "=== P MOS ===" << std::endl;
   for (const auto& net : nets_of_a.first) {
-    std::cout << "Nets of " << a.first->GetName() << ": " << net->GetName()
+    std::cerr << "Nets of " << a.first->GetName() << ": " << net->GetName()
               << std::endl;
   }
   for (const auto& net : nets_of_b.first) {
-    std::cout << "Nets of " << b.first->GetName() << ": " << net->GetName()
+    std::cerr << "Nets of " << b.first->GetName() << ": " << net->GetName()
               << std::endl;
   }
-  std::cout << "=== N MOS ===" << std::endl;
+  std::cerr << "=== N MOS ===" << std::endl;
   for (const auto& net : nets_of_a.second) {
-    std::cout << "Nets of " << a.second->GetName() << ": " << net->GetName()
+    std::cerr << "Nets of " << a.second->GetName() << ": " << net->GetName()
               << std::endl;
   }
   for (const auto& net : nets_of_b.second) {
-    std::cout << "Nets of " << b.second->GetName() << ": " << net->GetName()
+    std::cerr << "Nets of " << b.second->GetName() << ": " << net->GetName()
               << std::endl;
   }
+#endif
+
   auto p_mos_intersection = std::vector<std::shared_ptr<Net>>{};
   auto n_mos_intersection = std::vector<std::shared_ptr<Net>>{};
   std::set_intersection(nets_of_a.first.cbegin(), nets_of_a.first.cend(),
@@ -492,14 +512,18 @@ Edge FindEdgeOfTwoNeighborVertices(const Vertex& a, const Vertex& b) {
                         std::back_inserter(n_mos_intersection));
   assert(!p_mos_intersection.empty() && !n_mos_intersection.empty()
          && "The 2 vertices should have at least one common net.");
-  std::cout << a.first->GetName() << " " << b.first->GetName() << std::endl;
+
+#ifdef DEBUG
+  std::cerr << a.first->GetName() << " " << b.first->GetName() << std::endl;
   for (const auto& net : p_mos_intersection) {
-    std::cout << "P MOS intersection: " << net->GetName() << std::endl;
+    std::cerr << "P MOS intersection: " << net->GetName() << std::endl;
   }
-  std::cout << a.second->GetName() << " " << b.second->GetName() << std::endl;
+  std::cerr << a.second->GetName() << " " << b.second->GetName() << std::endl;
   for (const auto& net : n_mos_intersection) {
-    std::cout << "N MOS intersection: " << net->GetName() << std::endl;
+    std::cerr << "N MOS intersection: " << net->GetName() << std::endl;
   }
+#endif
+
   return {p_mos_intersection.front(), n_mos_intersection.front()};
 }
 

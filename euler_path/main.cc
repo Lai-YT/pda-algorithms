@@ -28,21 +28,23 @@ int main(int argc, char const* argv[]) {
     return ret;
   }
 
-  std::cout << "=== Circuit ===" << std::endl;
+#ifdef DEBUG
+  std::cerr << "=== Circuit ===" << std::endl;
   for (const auto& mos : circuit->mos) {
-    std::cout << mos->GetName() << " " << mos->GetDrain()->GetName() << " "
+    std::cerr << mos->GetName() << " " << mos->GetDrain()->GetName() << " "
               << mos->GetGate()->GetName() << " " << mos->GetSource()->GetName()
               << " " << mos->GetSubstrate()->GetName() << std::endl;
   }
 
-  std::cout << "=== Nets ===" << std::endl;
+  std::cerr << "=== Nets ===" << std::endl;
   for (const auto& [_, net] : circuit->nets) {
-    std::cout << net->GetName();
+    std::cerr << net->GetName();
     for (const auto& connection : net->Connections()) {
-      std::cout << " " << connection.lock()->GetName();
+      std::cerr << " " << connection.lock()->GetName();
     }
-    std::cout << std::endl;
+    std::cerr << std::endl;
   }
+#endif
 
   auto path_finder = PathFinder{circuit};
   auto [path, edges, hpwl] = path_finder.FindPath();
