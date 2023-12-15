@@ -418,11 +418,27 @@ double PathFinder::CalculateHpwl_(const HamiltonPath& path) const {
                    + (MinNetIdx(idx_in_p) == 0)
                    + (MaxNetIdx(idx_in_n) == net_order.size() - 1)
                    + (MinNetIdx(idx_in_n) == 0);
+    } else if (idx_in_p.size() > 1 && idx_in_n.empty()) {
+      // (5) Only P MOS has the net at multiple points. No vertical wire length.
+      hpwl
+          += kUnitHorizontalWidth * (MaxNetIdx(idx_in_p) - MinNetIdx(idx_in_p));
+      adjustment = (MaxNetIdx(idx_in_p) == net_order.size() - 1)
+                   + (MinNetIdx(idx_in_p) == 0);
+    } else if (idx_in_p.empty() && idx_in_n.size() > 1) {
+      // (6) Only N MOS has the net at multiple points. No vertical wire length.
+      hpwl
+          += kUnitHorizontalWidth * (MaxNetIdx(idx_in_n) - MinNetIdx(idx_in_n));
+      adjustment = (MaxNetIdx(idx_in_n) == net_order.size() - 1)
+                   + (MinNetIdx(idx_in_n) == 0);
     } else {
       // Single point in a type. No wire length.
       continue;
     }
     hpwl += (-kGateSpacing + kHorizontalExtension) / 2.0 * adjustment;
+
+#ifdef DEBUG
+    std::cerr << "HPWL: " << hpwl << std::endl;
+#endif
   }
   return hpwl;
 }
