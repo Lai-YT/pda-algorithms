@@ -12,6 +12,7 @@
 
 #include "circuit.h"
 #include "mos.h"
+#include "path.h"
 
 #ifdef DEBUG
 #include <string>
@@ -31,10 +32,9 @@ namespace {
 // not member functions.
 //
 
+/// @brief The definition of neighbor is that the two MOS transistors have their
+/// drain or source connected to another's drain or source.
 bool IsNeighbor(const Vertex& a, const Vertex& b);
-/// @note To be neighbor, the two MOS must have their source or drain
-/// connected. The gate is used for pairing and the substrate usually connects
-/// to the same point, so we don't depend on them.
 bool IsNeighbor(const Mos& a, const Mos& b);
 
 /// @note In case of multiply connections, we choose one in unspecified order.
@@ -51,8 +51,7 @@ std::shared_ptr<Net> FindEdgeToNeighbor(const Mos& a, const Mos& b);
 /// However, if a MOS has all 4 pins connected to different points, and it acts
 /// as either the starting or ending point of the path, we choose one pin to
 /// exclude.
-HamiltonPath ConnectHamiltonPathOfSubgraphsWithDummy(
-    const std::vector<HamiltonPath>&);
+Path ConnectHamiltonPathOfSubgraphsWithDummy(const std::vector<Path>&);
 
 /// @brief If the length of the Hamilton path is 1, nets other than the gate are
 /// free. In this case, there are 2 free edges, one of them is returned.
@@ -66,6 +65,16 @@ Edge FindFreeNetOfStartingVertex(const HamiltonPath&);
 /// the previous vertex and the gate.
 Edge FindFreeNetOfEndingVertex(const HamiltonPath&);
 
+/// @note The number of free nets in P and N MOS may not be the same.
+struct FreeNets {
+  std::vector<std::shared_ptr<Net>> p;
+  std::vector<std::shared_ptr<Net>> n;
+};
+
+/// @return The free nets of the `fragment`, which can be used to connect to the
+/// next neighbor.
+FreeNets FindFreeNets(const PathFragment& fragment);
+
 /// @return The nets that connect the MOS in the Hamilton path, including the
 /// gate connections of the MOS.
 std::vector<Edge> GetEdgesOf(const HamiltonPath&);
@@ -78,7 +87,7 @@ std::vector<std::shared_ptr<Net>> NetsOf(const Mos&);
 
 }  // namespace
 
-std::tuple<HamiltonPath, std::vector<Edge>, double> PathFinder::FindPath() {
+std::tuple<Path> PathFinder::FindPath() {
   GroupVertices_();
   BuildGraph_();
 
@@ -99,7 +108,8 @@ std::tuple<HamiltonPath, std::vector<Edge>, double> PathFinder::FindPath() {
 #ifdef DEBUG
   std::cerr << "=== Paths ===" << std::endl;
   for (const auto& path : paths) {
-    for (const auto& [p, n] : path) {
+    for (auto curr = path.head; curr; curr = curr->next) {
+      auto [p, n] = curr->vertex;
       std::cerr << p->GetName() << "\t" << n->GetName() << std::endl;
     }
     std::cerr << "@@@" << std::endl;
@@ -107,7 +117,7 @@ std::tuple<HamiltonPath, std::vector<Edge>, double> PathFinder::FindPath() {
 #endif
 
   auto path = ConnectHamiltonPathOfSubgraphsWithDummy(paths);
-  return {path, GetEdgesOf(path), CalculateHpwl_(path)};
+  return path;
 }
 
 void PathFinder::GroupVertices_() {
@@ -203,15 +213,17 @@ void PathFinder::BuildGraph_() {
   }
 }
 
-std::vector<HamiltonPath> PathFinder::FindHamiltonPaths_() {
+std::vector<Path> PathFinder::FindHamiltonPaths_() {
   // Select from the to visited list should be faster than iterating through all
   // the vertices and checking whether they are in the visited list.
   auto to_visit = std::set<Vertex>{vertices_.cbegin(), vertices_.cend()};
-  auto paths = std::vector<HamiltonPath>{};
+  auto paths = std::vector<Path>{};
   while (!to_visit.empty()) {
     // Randomly select a vertex to start. We select the first one for
     // simplicity.
-    auto path = HamiltonPath{*to_visit.begin()};
+    auto path = Path{};
+    path.head = std::make_shared<PathFragment>(*to_visit.begin());
+    path.tail = path.head;
     to_visit.erase(to_visit.begin());
 
     // Find a Hamilton path.
@@ -243,91 +255,166 @@ std::vector<HamiltonPath> PathFinder::FindHamiltonPaths_() {
   return paths;
 }
 
-std::optional<HamiltonPath> PathFinder::Extend_(
-    HamiltonPath path, std::set<Vertex>& to_visit) const {
+std::optional<Path> PathFinder::Extend_(Path path,
+                                        std::set<Vertex>& to_visit) const {
   // If the neighbor of the start or end vertex is not in the path, then we add
-  // it into the path. We check the end vertex first, due to the efficiency of
-  // inserting to the back over the front.
+  // it into the path.
   // NOTE: If a net is already used in a connection, we cannot uses it
   // again.
-  for (const auto& neighbor : adjacency_list_.at(path.back())) {
+  for (const auto& neighbor : adjacency_list_.at(path.tail->vertex)) {
+    if (to_visit.find(neighbor) != to_visit.cend()) {
 #ifdef DEBUG
-    std::cerr << "End vertex: " << path.back().first->GetName() << "\t"
-              << path.back().second->GetName() << std::endl;
-    std::cerr << "Neighbor: " << neighbor.first->GetName() << "\t"
-              << neighbor.second->GetName() << std::endl;
-    auto edge_to_neighbor = FindEdgeToNeighbor(path.back(), neighbor);
-    auto free_net_of_ending_vertex = FindFreeNetOfEndingVertex(path);
-    std::cerr << "Free net of ending vertex: "
-              << free_net_of_ending_vertex.first->GetName() << "\t"
-              << free_net_of_ending_vertex.second->GetName() << std::endl;
-    std::cerr << "Edge to neighbor: " << edge_to_neighbor.first->GetName()
-              << "\t" << edge_to_neighbor.second->GetName() << std::endl;
+      std::cerr << "Extend " << path.tail->vertex.first->GetName() << " "
+                << path.tail->vertex.second->GetName() << "\tto "
+                << neighbor.first->GetName() << " "
+                << neighbor.second->GetName() << "...";
 #endif
 
-    if (to_visit.find(neighbor) != to_visit.cend()
-        && FindEdgeToNeighbor(path.back(), neighbor)
-               == FindFreeNetOfEndingVertex(path)) {
-      path.push_back(neighbor);
-      to_visit.erase(neighbor);
-      return path;
+      auto edge = Edge{};
+      auto free_nets = FindFreeNets(*path.tail);
+      for (auto free_net : free_nets.p) {
+        if (free_net == neighbor.first->GetSource()
+            || free_net == neighbor.first->GetDrain()) {
+          edge.first = free_net;
+          break;
+        }
+      }
+      for (auto free_net : free_nets.n) {
+        if (free_net == neighbor.second->GetSource()
+            || free_net == neighbor.second->GetDrain()) {
+          edge.second = free_net;
+          break;
+        }
+      }
+      if (edge.first && edge.second) {
+        path.tail->next = std::make_shared<PathFragment>(neighbor, path.tail);
+        path.tail->edge_to_next = edge;
+        path.tail = path.tail->next;
+        to_visit.erase(neighbor);
+#ifdef DEBUG
+        std::cerr << "\t"
+                  << "[SUCCESS]" << std::endl;
+#endif
+        return path;
+      }
+#ifdef DEBUG
+      std::cerr << "\t"
+                << "[FAIL]" << std::endl;
+#endif
     }
   }
-  for (const auto& neighbor : adjacency_list_.at(path.front())) {
+  for (const auto& neighbor : adjacency_list_.at(path.head->vertex)) {
+    if (to_visit.find(neighbor) != to_visit.cend()) {
 #ifdef DEBUG
-    std::cerr << "Start vertex: " << path.front().first->GetName() << "\t"
-              << path.front().second->GetName() << std::endl;
-    std::cerr << "Neighbor: " << neighbor.first->GetName() << "\t"
-              << neighbor.second->GetName() << std::endl;
-    auto edge_to_neighbor = FindEdgeToNeighbor(path.front(), neighbor);
-    auto free_net_of_starting_vertex = FindFreeNetOfStartingVertex(path);
-    std::cerr << "Free net of starting vertex: "
-              << free_net_of_starting_vertex.first->GetName() << "\t"
-              << free_net_of_starting_vertex.second->GetName() << std::endl;
+      std::cerr << "Extend " << path.head->vertex.first->GetName() << " "
+                << path.head->vertex.second->GetName() << "\tto "
+                << neighbor.first->GetName() << " "
+                << neighbor.second->GetName() << "...";
 #endif
-    if (to_visit.find(neighbor) != to_visit.cend()
-        && FindEdgeToNeighbor(path.front(), neighbor)
-               == FindFreeNetOfStartingVertex(path)) {
-      path.insert(path.cbegin(), neighbor);
-      to_visit.erase(neighbor);
-      return path;
+
+      auto edge = Edge{};
+      auto free_nets = FindFreeNets(*path.head);
+      for (auto free_net : free_nets.p) {
+        if (free_net == neighbor.first->GetSource()
+            || free_net == neighbor.first->GetDrain()) {
+          edge.first = free_net;
+          break;
+        }
+      }
+      for (auto free_net : free_nets.n) {
+        if (free_net == neighbor.second->GetSource()
+            || free_net == neighbor.second->GetDrain()) {
+          edge.second = free_net;
+          break;
+        }
+      }
+      if (edge.first && edge.second) {
+        auto head = std::make_shared<PathFragment>(
+            neighbor, std::weak_ptr<PathFragment>{}, path.head, edge);
+        path.head->prev = head;
+        path.head = head;
+        to_visit.erase(neighbor);
+#ifdef DEBUG
+        std::cerr << "\t"
+                  << "[SUCCESS]" << std::endl;
+#endif
+        return path;
+      }
+#ifdef DEBUG
+      std::cerr << "\t"
+                << "[FAIL]" << std::endl;
+#endif
     }
   }
   return std::nullopt;
 }
 
-std::vector<HamiltonPath> PathFinder::Rotate_(const HamiltonPath& path) const {
-  if (path.size() <= 2) {
+std::vector<Path> PathFinder::Rotate_(const Path& path) const {
+  // Length smaller than 3 cannot be rotated.
+  if (path.head == path.tail || path.head->next == path.tail) {
     return {};
   }
-
-#ifdef DEBUG
-  std::cerr << "=== Rotating ===" << std::endl;
-  std::cerr << "original: " << std::endl;
-  for (const auto& [p, n] : path) {
-    std::cerr << p->GetName() << "\t" << n->GetName() << std::endl;
-  }
-#endif
-
-  auto rotated_paths = std::vector<HamiltonPath>{};
+  auto rotated_paths = std::vector<Path>{};
   // If the start or end vertex has a short cut to the vertex in the middle of
   // the path, that vertex becomes the new end or start vertex, respectively.
   // NOTE: The rotation is actually a reverse.
-  for (auto i = std::size_t{2} /* skip the immediate neighbor */;
-       i < path.size(); i++) {
-    if (IsNeighbor(path.front(), path.at(i))) {
-      // Make a copy for the rotating.
+  for (auto curr = path.head->next->next /* skip the immediate neighbor */;
+       curr; curr = curr->next) {
+    if (IsNeighbor(path.head->vertex, curr->vertex)) {
+      // Make a copy for rotating.
       auto rotated_path = path;
-      std::reverse(rotated_path.begin(), rotated_path.begin() + i);
+      // Fast forward to the corresponding vertex, as we cannot manipulate the
+      // original path.
+      auto rotated_curr = rotated_path.head;
+      while (rotated_curr->vertex != curr->vertex) {
+        rotated_curr = rotated_curr->next;
+      }
+      // The head takes a shortcut to the curr. The link between the previous of
+      // curr and the curr is broken. Then we reverse the path from the previous
+      // of curr to the head.
+      auto new_head = rotated_curr->prev.lock();
+      new_head->next = nullptr;
+      auto prev = rotated_curr;
+      rotated_curr = rotated_path.head;
+      while (rotated_curr) {
+        auto next = rotated_curr->next;
+        rotated_curr->next = prev;
+        rotated_curr->next->prev = rotated_curr;
+        prev = rotated_curr;
+        rotated_curr = next;
+      }
       rotated_paths.push_back(std::move(rotated_path));
     }
   }
-  for (auto i = std::size_t{0};
-       i < path.size() - 2 /* skip the immediate neighbor */; i++) {
-    if (IsNeighbor(path.back(), path.at(i))) {
+
+  for (auto curr = path.head;
+       curr->next->next /* skip the immediate neighbor */; curr = curr->next) {
+    if (IsNeighbor(path.tail->vertex, curr->vertex)) {
+      // Make a copy for rotating.
       auto rotated_path = path;
-      // The path is broke from the left neighbor of the vertex at i.
-      std::reverse(rotated_path.begin() + i + 1, rotated_path.end());
+      // Fast forward to the corresponding vertex, as we cannot manipulate the
+      // original path.
+      auto rotated_curr = rotated_path.head;
+      while (rotated_curr->vertex != curr->vertex) {
+        rotated_curr = rotated_curr->next;
+      }
+      // The curr takes the shortcut to the tail. The link between
+      // the curr and the next of curr is broken. Then we reverse the path from
+      // the next of curr to the tail.
+      rotated_curr->next->prev.reset();
+      rotated_curr = rotated_curr->next;
+      rotated_curr->prev.lock()->next = rotated_path.tail;
+      rotated_curr->prev.reset();
+      assert(!rotated_curr->prev.lock());
+      rotated_path.tail = rotated_curr;
+      auto prev = std::shared_ptr<PathFragment>{};
+      while (rotated_curr) {
+        auto next = rotated_curr->next;
+        rotated_curr->next = prev;
+        rotated_curr->next->prev = rotated_curr;
+        prev = rotated_curr;
+        rotated_curr = next;
+      }
       rotated_paths.push_back(std::move(rotated_path));
     }
   }
@@ -507,40 +594,58 @@ std::shared_ptr<Net> FindEdgeToNeighbor(const Mos& a, const Mos& b) {
   return nullptr;
 }
 
-HamiltonPath ConnectHamiltonPathOfSubgraphsWithDummy(
-    const std::vector<HamiltonPath>& paths) {
+Path ConnectHamiltonPathOfSubgraphsWithDummy(const std::vector<Path>& paths) {
   if (paths.size() == 1) {
     return paths.front();
   }
-  auto path = HamiltonPath{paths.front()};
+  auto path = Path{};
+  path.head = paths.front().head;
   for (auto i = std::size_t{1}; i < paths.size(); i++) {
     // Get the net that is free (not already used as an edge) to be connected
     // with the dummy.
     // The 2 dummies are connected with the dummy net.
     auto dummy_net = std::make_shared<Net>("Dummy");
-    auto ending_vertex = path.back();
-    auto ending_free_net = FindFreeNetOfEndingVertex(path);
+    auto ending_vertex = paths.at(i - 1).tail;
+    auto ending_free_net = FindFreeNets(*ending_vertex);
+    assert(ending_free_net.p.size() >= 1 && ending_free_net.n.size() >= 1);
     // The size of the dummy is the same as the MOS next to it.
-    auto ending_dummy = Vertex{
-        Mos::Create("Dummy", Mos::Type::kP, ending_free_net.first, dummy_net,
-                    dummy_net, dummy_net, ending_vertex.first->GetWidth(),
-                    ending_vertex.first->GetLength()),
-        Mos::Create("Dummy", Mos::Type::kN, ending_free_net.second, dummy_net,
-                    dummy_net, dummy_net, ending_vertex.second->GetWidth(),
-                    ending_vertex.second->GetLength())};
-    auto starting_vertex = paths.at(i).front();
-    auto starting_free_net = FindFreeNetOfStartingVertex(paths.at(i));
+    auto ending_dummy
+        = Vertex{Mos::Create("Dummy", Mos::Type::kP, ending_free_net.p.front(),
+                             dummy_net, dummy_net, dummy_net,
+                             ending_vertex->vertex.first->GetWidth(),
+                             ending_vertex->vertex.first->GetLength()),
+                 Mos::Create("Dummy", Mos::Type::kN, ending_free_net.n.front(),
+                             dummy_net, dummy_net, dummy_net,
+                             ending_vertex->vertex.second->GetWidth(),
+                             ending_vertex->vertex.second->GetLength())};
+    auto next_of_ending_vertex
+        = std::make_shared<PathFragment>(ending_dummy, ending_vertex);
+    ending_vertex->next = next_of_ending_vertex;
+    ending_vertex->edge_to_next
+        = {ending_free_net.p.front(), ending_free_net.n.front()};
+
+    auto starting_vertex = paths.at(i).head;
+    auto starting_free_net = FindFreeNets(*starting_vertex);
     auto starting_dummy = Vertex{
-        Mos::Create("Dummy", Mos::Type::kP, starting_free_net.first, dummy_net,
-                    dummy_net, dummy_net, starting_vertex.first->GetWidth(),
-                    starting_vertex.first->GetLength()),
-        Mos::Create("Dummy", Mos::Type::kN, starting_free_net.second, dummy_net,
-                    dummy_net, dummy_net, starting_vertex.second->GetWidth(),
-                    starting_vertex.second->GetLength())};
-    path.push_back(ending_dummy);
-    path.push_back(starting_dummy);
-    path.insert(path.cend(), paths.at(i).cbegin(), paths.at(i).cend());
+        Mos::Create("Dummy", Mos::Type::kP, starting_free_net.p.front(),
+                    dummy_net, dummy_net, dummy_net,
+                    starting_vertex->vertex.first->GetWidth(),
+                    starting_vertex->vertex.first->GetLength()),
+        Mos::Create("Dummy", Mos::Type::kN, starting_free_net.n.front(),
+                    dummy_net, dummy_net, dummy_net,
+                    starting_vertex->vertex.second->GetWidth(),
+                    starting_vertex->vertex.second->GetLength())};
+    auto prev_of_starting_vertex = std::make_shared<PathFragment>(
+        starting_dummy, std::weak_ptr<PathFragment>{}, starting_vertex,
+        std::make_pair(starting_free_net.p.front(),
+                       starting_free_net.n.front()));
+    starting_vertex->prev = prev_of_starting_vertex;
+
+    next_of_ending_vertex->next = prev_of_starting_vertex;
+    next_of_ending_vertex->edge_to_next = {dummy_net, dummy_net};
+    prev_of_starting_vertex->prev = next_of_ending_vertex;
   }
+  path.tail = paths.back().tail;
   return path;
 }
 
@@ -700,9 +805,63 @@ std::vector<Edge> GetEdgesWithGateExcludedOf(const HamiltonPath& path) {
 }
 
 std::vector<std::shared_ptr<Net>> NetsOf(const Mos& mos) {
-  // NOTE: The connection of substrate doesn't count since all P MOS usually all
-  // connect their substrate to the same point. So are the N MOS.
+  // NOTE: The connection of the substrate doesn't count, as all P MOS typically
+  // connect their substrate to the same point, and they are not used in
+  // diffusion sharing. The same applies to N MOS.
   return {mos.GetDrain(), mos.GetGate(), mos.GetSource()};
 }
 
+FreeNets FindFreeNets(const PathFragment& fragment) {
+#ifdef DEBUG
+  std::cerr << "=== Find free nets of " << fragment.vertex.first->GetName()
+            << "\t" << fragment.vertex.second->GetName() << " ===" << std::endl;
+#endif
+
+  auto net_count_of_p_most = std::map<std::shared_ptr<Net>, std::size_t>{};
+  for (auto net : NetsOf(*fragment.vertex.first)) {
+    ++net_count_of_p_most[net];
+  }
+  auto net_count_of_n_most = std::map<std::shared_ptr<Net>, std::size_t>{};
+  for (auto net : NetsOf(*fragment.vertex.second)) {
+    ++net_count_of_n_most[net];
+  }
+  // Remove gate from the count.
+  --net_count_of_p_most[fragment.vertex.first->GetGate()];
+  --net_count_of_n_most[fragment.vertex.second->GetGate()];
+  // Remove the connection between the fragment and the next fragment, if any.
+  if (fragment.next) {
+    --net_count_of_p_most[fragment.edge_to_next.first];
+    --net_count_of_n_most[fragment.edge_to_next.second];
+  }
+  // Remove the connection between the fragment and the previous fragment, if
+  // any.
+  if (auto prev = fragment.prev.lock()) {
+    --net_count_of_p_most[prev->edge_to_next.first];
+    --net_count_of_n_most[prev->edge_to_next.second];
+  }
+  auto free_nets = FreeNets{};
+  for (const auto& [net, count] : net_count_of_p_most) {
+    if (count) {
+      free_nets.p.push_back(net);
+    }
+  }
+  for (const auto& [net, count] : net_count_of_n_most) {
+    if (count) {
+      free_nets.n.push_back(net);
+    }
+  }
+#ifdef DEBUG
+  std::cerr << "P MOS: ";
+  for (const auto& net : free_nets.p) {
+    std::cerr << net->GetName() << " ";
+  }
+  std::cerr << std::endl;
+  std::cerr << "N MOS: ";
+  for (const auto& net : free_nets.n) {
+    std::cerr << net->GetName() << " ";
+  }
+  std::cerr << std::endl;
+#endif
+  return free_nets;
+}
 }  // namespace

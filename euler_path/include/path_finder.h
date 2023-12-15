@@ -14,6 +14,7 @@ namespace euler {
 class Mos;
 struct Circuit;
 class Net;
+struct Path;
 
 using Vertex = std::pair<std::shared_ptr<Mos>, std::shared_ptr<Mos>>;
 using Edge = std::pair<std::shared_ptr<Net>, std::shared_ptr<Net>>;
@@ -32,7 +33,7 @@ class PathFinder {
   /// for each pair.
   /// @return The Hamiltonian path of the MOS, the corresponding net connection,
   /// and the HPWL.
-  std::tuple<HamiltonPath, std::vector<Edge>, double> FindPath();
+  std::tuple<Path> FindPath();
 
   PathFinder(const std::shared_ptr<Circuit>& circuit) : circuit_{circuit} {}
 
@@ -52,14 +53,13 @@ class PathFinder {
   /// problem: https://en.wikipedia.org/wiki/Hamiltonian_path.
   /// @details Here I'll be using a heuristic algorithm described in the
   /// post: https://mathoverflow.net/a/327893.
-  std::vector<HamiltonPath> FindHamiltonPaths_();
+  std::vector<Path> FindHamiltonPaths_();
   double CalculateHpwl_(const HamiltonPath& path) const;
 
   /// @return The extended Hamiltonian path, if any.
-  std::optional<HamiltonPath> Extend_(HamiltonPath path,
-                                      std::set<Vertex>& to_visit) const;
+  std::optional<Path> Extend_(Path path, std::set<Vertex>& to_visit) const;
   /// @return The family of the Posa transformations of the given path.
-  std::vector<HamiltonPath> Rotate_(const HamiltonPath& path) const;
+  std::vector<Path> Rotate_(const Path& path) const;
 };
 
 }  // namespace euler
