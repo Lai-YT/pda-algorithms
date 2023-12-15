@@ -8,11 +8,14 @@
 #include <memory>
 #include <optional>
 #include <set>
-#include <string>
 #include <vector>
 
 #include "circuit.h"
 #include "mos.h"
+
+#ifdef DEBUG
+#include <string>
+#endif
 
 using namespace euler;
 

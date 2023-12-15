@@ -1,5 +1,7 @@
 #include "mos.h"
 
+#include <utility>
+
 #include "circuit.h"
 
 using namespace euler;

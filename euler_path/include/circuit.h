@@ -8,7 +8,7 @@
 #include <vector>
 
 namespace euler {
-struct Mos;
+class Mos;
 
 /// @brief Connects the MOS transistors.
 class Net {

@@ -3,12 +3,10 @@
 
 #include <memory>
 #include <string>
-#include <utility>
-#include <vector>
 
 namespace euler {
 
-struct Net;
+class Net;
 
 /// @note The MOS transistor serve as the nodes in the graph. They are connected
 /// through the nets. Two MOS transistors are connected if they share a net.
