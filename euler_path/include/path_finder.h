@@ -33,7 +33,7 @@ class PathFinder {
   /// for each pair.
   /// @return The Hamiltonian path of the MOS, the corresponding net connection,
   /// and the HPWL.
-  std::tuple<Path, std::vector<Edge>> FindPath();
+  std::tuple<Path, std::vector<Edge>, double> FindPath();
 
   PathFinder(const std::shared_ptr<Circuit>& circuit) : circuit_{circuit} {}
 
@@ -54,7 +54,7 @@ class PathFinder {
   /// @details Here I'll be using a heuristic algorithm described in the
   /// post: https://mathoverflow.net/a/327893.
   std::vector<Path> FindHamiltonPaths_();
-  double CalculateHpwl_(const HamiltonPath& path) const;
+  double CalculateHpwl_(const Path& path) const;
 
   /// @return The extended Hamiltonian path, if any.
   std::optional<Path> Extend_(Path path, std::set<Vertex>& to_visit) const;

@@ -47,10 +47,10 @@ int main(int argc, char const* argv[]) {
 #endif
 
   auto path_finder = PathFinder{circuit};
-  auto [path, edges] = path_finder.FindPath();
+  auto [path, edges, hpwl] = path_finder.FindPath();
 
   // // The first line gives the total HPWL of all nets in the SPICE netlist.
-  // std::cout << hpwl << std::endl;
+  std::cout << hpwl << std::endl;
   // The second and third lines shows the Euler path of the PMOS network in
   // terms of instance names and net names, respectively.
   auto prev_p_mos = path.head->vertex.first;

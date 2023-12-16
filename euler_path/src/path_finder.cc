@@ -82,13 +82,13 @@ std::vector<Edge> GetEdgesOf(const Path&);
 
 /// @note For HPWL calculation, we need to know the Hamilton distance between
 /// true nets. This makes the existence of gate a noise. So we exclude the gate.
-std::vector<Edge> GetEdgesWithGateExcludedOf(const HamiltonPath& path);
+std::vector<Edge> GetEdgesWithGateExcludedOf(const Path& path);
 
 std::vector<std::shared_ptr<Net>> NetsOf(const Mos&);
 
 }  // namespace
 
-std::tuple<Path, std::vector<Edge>> PathFinder::FindPath() {
+std::tuple<Path, std::vector<Edge>, double> PathFinder::FindPath() {
   GroupVertices_();
   BuildGraph_();
 
@@ -121,7 +121,7 @@ std::tuple<Path, std::vector<Edge>> PathFinder::FindPath() {
 #ifdef DEBUG
   PrintPath(path);
 #endif
-  return {path, GetEdgesOf(path)};
+  return {path, GetEdgesOf(path), CalculateHpwl_(path)};
 }
 
 void PathFinder::GroupVertices_() {
@@ -433,7 +433,7 @@ std::vector<Path> PathFinder::Rotate_(const Path& path) const {
   return rotated_paths;
 }
 
-double PathFinder::CalculateHpwl_(const HamiltonPath& path) const {
+double PathFinder::CalculateHpwl_(const Path& path) const {
   // Design rule parameters.
   constexpr auto kVerticalWidthIncrement = 27.0;
   constexpr auto kHorizontalExtension = 25.0;
@@ -455,12 +455,14 @@ double PathFinder::CalculateHpwl_(const HamiltonPath& path) const {
   // net at a single point, we also need to add a vertical length.
   // If both types have the net at a single point, we don't need to calculate
   // the wire length by their Hamilton distance.
+
   // NOTE: The width of the MOS are said to be consistent among the
   // same type and the length are all the same. So we can just use the first
   // one.
-  const auto width_of_p_mos = path.front().first->GetWidth();
-  const auto width_of_n_mos = path.front().second->GetWidth();
-  [[maybe_unused]] const auto length_of_mos = path.front().first->GetLength();
+  const auto width_of_p_mos = path.head->vertex.first->GetWidth();
+  const auto width_of_n_mos = path.head->vertex.second->GetWidth();
+  [[maybe_unused]] const auto length_of_mos
+      = path.head->vertex.first->GetLength();
   const auto vertical_wire_length
       = kVerticalWidthIncrement + (width_of_p_mos + width_of_n_mos) / 2;
   for (auto net : nets) {
@@ -492,8 +494,7 @@ double PathFinder::CalculateHpwl_(const HamiltonPath& path) const {
 #endif
 
     const auto HorizontalWidthOf
-        = [kUnitHorizontalWidth](
-              const std::vector<std::size_t>& sorted_idx_of_nets) {
+        = [](const std::vector<std::size_t>& sorted_idx_of_nets) {
             return kUnitHorizontalWidth
                    * (sorted_idx_of_nets.back() - sorted_idx_of_nets.front());
           };
@@ -832,13 +833,20 @@ std::vector<Edge> GetEdgesOf(const HamiltonPath& path) {
   return edges;
 }
 
-std::vector<Edge> GetEdgesWithGateExcludedOf(const HamiltonPath& path) {
+std::vector<Edge> GetEdgesWithGateExcludedOf(const Path& path) {
   auto edges = std::vector<Edge>{};
-  edges.push_back(FindFreeNetOfStartingVertex(path));
-  for (auto i = std::size_t{1}; i < path.size(); i++) {
-    edges.push_back(FindEdgeToNeighbor(path.at(i - 1), path.at(i)));
+  auto free_nets_of_head = FindFreeNets(*path.head);
+  edges.emplace_back(free_nets_of_head.p.front(), free_nets_of_head.n.front());
+  for (auto curr = path.head; curr->next /* the tail is excluded */;
+       curr = curr->next) {
+    edges.push_back(curr->edge_to_next);
   }
-  edges.push_back(FindFreeNetOfEndingVertex(path));
+  auto free_nets_of_tail = FindFreeNets(*path.tail);
+  // The use of "back" instead of "front" is due to the possibility that the
+  // tail may be the same as the head. Using "front" could result in the same
+  // net being used twice. However, this is likely to be unreliable, as the
+  // ordering has no guarantee.
+  edges.emplace_back(free_nets_of_tail.p.back(), free_nets_of_tail.n.back());
   return edges;
 }
 
