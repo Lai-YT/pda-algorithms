@@ -426,14 +426,11 @@ double PathFinder::CalculateHpwl_(const Path& path) const {
     nets.push_back(net);
   }
   auto hpwl = 0.0;
-  // For each net (excluding dummy nets not connected to any MOS other than the
-  // dummy MOS), we determine the maximum wire length in the path of the P-type
-  // MOS and the N-type MOS. If both types contain such paths connected by this
-  // net, we add a vertical length, as the net has to cross both types of MOS.
-  // If only one type of MOS contains such a path, but the other type has the
-  // net at a single point, we also need to add a vertical length.
-  // If both types have the net at a single point, we don't need to calculate
-  // the wire length by their Hamilton distance.
+  // The calculation of HPWL (Half Perimeter Wire Length) for a specific wire
+  // involves enclosing all of its pins in a rectangle, and the HPWL is then the
+  // half perimeter of that rectangle. If the net is only connected to a single
+  // point, then the HPWL is 0. If the net doesn't cross both P and N MOS, then
+  // the HPWL is the horizontal wire length.
 
   // NOTE: The width of the MOS are said to be consistent among the
   // same type and the length are all the same. So we can just use the first
@@ -474,84 +471,42 @@ double PathFinder::CalculateHpwl_(const Path& path) const {
 
     const auto HorizontalWidthOf
         = [](const std::vector<std::size_t>& sorted_idx_of_nets) {
-            return kUnitHorizontalWidth
-                   * (sorted_idx_of_nets.back() - sorted_idx_of_nets.front());
+            return sorted_idx_of_nets.size() < 2
+                       ? 0.0
+                       : kUnitHorizontalWidth
+                             * (sorted_idx_of_nets.back()
+                                - sorted_idx_of_nets.front());
           };
 
-    const auto IsCoveringTheEnd
-        = [&net_order](const std::vector<std::size_t>& sorted_idx_of_nets) {
-            return sorted_idx_of_nets.back() == net_order.size() - 1;
-          };
-
-    const auto IsCoveringTheStart
-        = [](const std::vector<std::size_t>& sorted_idx_of_nets) {
-            return sorted_idx_of_nets.front() == 0;
-          };
-
-    // If any of the net is at the end of the path, we need to use the
-    // extension width instead of a normal gate spacing.
-    auto adjustment = 0.0;
-    // (1) both P and N MOS have the net at a single point.
-    if (idx_in_p.size() == 1 && idx_in_n.size() == 1) {
-      // Treat them as in the same type + vertical wire length.
-      /// @note The indices are sorted.
-      auto augmented_idx
-          = decltype(idx_in_p){std::min(idx_in_p.front(), idx_in_n.front()),
-                               std::max(idx_in_p.front(), idx_in_n.front())};
-      hpwl += HorizontalWidthOf(augmented_idx) + vertical_wire_length;
-      adjustment = HorizontalWidthOf(augmented_idx) == 0
-                       ? 0
-                       : IsCoveringTheEnd(augmented_idx)
-                             + IsCoveringTheStart(augmented_idx);
-    } else if (idx_in_p.size() > 1 && idx_in_n.size() == 1) {
-      // (2) P MOS has the net at multiple points, but N MOS has the net at a
-      // single point. Treat them as all in the P type + vertical wire length.
-      auto augmented_idx_in_p = idx_in_p;
-      augmented_idx_in_p.push_back(idx_in_n.front());
-      std::sort(augmented_idx_in_p.begin(), augmented_idx_in_p.end());
-      hpwl += HorizontalWidthOf(augmented_idx_in_p) + vertical_wire_length;
-      adjustment = IsCoveringTheEnd(augmented_idx_in_p)
-                   + IsCoveringTheStart(augmented_idx_in_p);
-    } else if (idx_in_p.size() == 1 && idx_in_n.size() > 1) {
-      // (3) P MOS has the net at a single point, but N MOS has the net at
-      // multiple points. Treat them as all in the N type + vertical wire
-      // length.
-      auto augmented_idx_in_n = idx_in_n;
-      augmented_idx_in_n.push_back(idx_in_p.front());
-      std::sort(augmented_idx_in_n.begin(), augmented_idx_in_n.end());
-      hpwl += HorizontalWidthOf(augmented_idx_in_n) + vertical_wire_length;
-      adjustment = IsCoveringTheEnd(augmented_idx_in_n)
-                   + IsCoveringTheStart(augmented_idx_in_n);
-    } else if (idx_in_p.size() > 1 && idx_in_n.size() > 1) {
-      // (4) Both P and N MOS have the net at multiple points. If these two path
-      // do overlap, we add up the wire length of the two paths + vertical wire
-      // length. If these two path do not overlap, we add up the wire length of
-      // the two paths + vertical wire length + wire length between the two
-      // paths.
-      hpwl += HorizontalWidthOf(idx_in_p) + HorizontalWidthOf(idx_in_n)
-              + vertical_wire_length;
-      if (idx_in_p.front() > idx_in_n.back()) {
-        // Path in P type is after the path in N type.
-        hpwl += kUnitHorizontalWidth * (idx_in_p.front() - idx_in_n.back());
-      } else if (idx_in_n.front() > idx_in_p.back()) {
-        // Path in N type is after the path in P type.
-        hpwl += kUnitHorizontalWidth * (idx_in_n.front() - idx_in_p.back());
-      }
-      adjustment = IsCoveringTheEnd(idx_in_p) + IsCoveringTheStart(idx_in_p)
-                   + IsCoveringTheEnd(idx_in_n) + IsCoveringTheStart(idx_in_n);
+    // The way we made the rectangle is to mix the indie of the net in P and N.
+    // The maximum index minus the minimum index is the horizontal width.
+    // If any of the corner of the rectangle is at the end of the path, we need
+    // to use the extension width instead of a normal gate spacing.
+    auto mixed_idx = std::vector<std::size_t>{};
+    if (!idx_in_p.empty() && !idx_in_n.empty()) {
+      mixed_idx = std::move(idx_in_p);
+      mixed_idx.insert(mixed_idx.end(), idx_in_n.begin(), idx_in_n.end());
+      std::sort(mixed_idx.begin(), mixed_idx.end());
+      hpwl += HorizontalWidthOf(mixed_idx) + vertical_wire_length;
     } else if (idx_in_p.size() > 1 && idx_in_n.empty()) {
-      // (5) Only P MOS has the net at multiple points. No vertical wire length.
-      hpwl += HorizontalWidthOf(idx_in_p);
-      adjustment = IsCoveringTheEnd(idx_in_p) + IsCoveringTheStart(idx_in_p);
+      // Only P MOS has the net at multiple points. No vertical wire length.
+      mixed_idx = std::move(idx_in_p);
+      hpwl += HorizontalWidthOf(mixed_idx);
     } else if (idx_in_p.empty() && idx_in_n.size() > 1) {
-      // (6) Only N MOS has the net at multiple points. No vertical wire length.
-      hpwl += HorizontalWidthOf(idx_in_n);
-      adjustment = IsCoveringTheEnd(idx_in_n) + IsCoveringTheStart(idx_in_n);
+      // Only N MOS has the net at multiple points. No vertical wire length.
+      mixed_idx = std::move(idx_in_n);
+      hpwl += HorizontalWidthOf(mixed_idx);
     } else {
-      // Single point in a type. No wire length.
+      // Single point in a type or not point at all.
       continue;
     }
-    hpwl += (-kGateSpacing + kHorizontalExtension) / 2.0 * adjustment;
+
+    if (!mixed_idx.empty()) {
+      auto adjustment
+          = (mixed_idx.back() == net_order.size() - 1)  // covers the end
+            + (mixed_idx.front() == 0);                 // covers the start
+      hpwl += (-kGateSpacing + kHorizontalExtension) / 2.0 * adjustment;
+    }
 
 #ifdef DEBUG
     std::cerr << "HPWL: " << hpwl << std::endl;
