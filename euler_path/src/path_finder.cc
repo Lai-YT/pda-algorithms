@@ -78,6 +78,7 @@ FreeNets FindFreeNets(const PathFragment& fragment);
 /// @return The nets that connect the MOS in the Hamilton path, including the
 /// gate connections of the MOS.
 std::vector<Edge> GetEdgesOf(const HamiltonPath&);
+std::vector<Edge> GetEdgesOf(const Path&);
 
 /// @note For HPWL calculation, we need to know the Hamilton distance between
 /// true nets. This makes the existence of gate a noise. So we exclude the gate.
@@ -87,7 +88,7 @@ std::vector<std::shared_ptr<Net>> NetsOf(const Mos&);
 
 }  // namespace
 
-std::tuple<Path> PathFinder::FindPath() {
+std::tuple<Path, std::vector<Edge>> PathFinder::FindPath() {
   GroupVertices_();
   BuildGraph_();
 
@@ -117,7 +118,10 @@ std::tuple<Path> PathFinder::FindPath() {
 #endif
 
   auto path = ConnectHamiltonPathOfSubgraphsWithDummy(paths);
-  return path;
+#ifdef DEBUG
+  PrintPath(path);
+#endif
+  return {path, GetEdgesOf(path)};
 }
 
 void PathFinder::GroupVertices_() {
@@ -383,6 +387,10 @@ std::vector<Path> PathFinder::Rotate_(const Path& path) const {
         prev = rotated_curr;
         rotated_curr = next;
       }
+#ifdef DEBUG
+      std::cerr << "=== Rotated path ===" << std::endl;
+      PrintPath(rotated_path);
+#endif
       rotated_paths.push_back(std::move(rotated_path));
     }
   }
@@ -415,6 +423,10 @@ std::vector<Path> PathFinder::Rotate_(const Path& path) const {
         prev = rotated_curr;
         rotated_curr = next;
       }
+#ifdef DEBUG
+      std::cerr << "=== Rotated path ===" << std::endl;
+      PrintPath(rotated_path);
+#endif
       rotated_paths.push_back(std::move(rotated_path));
     }
   }
@@ -778,6 +790,28 @@ Edge FindFreeNetOfEndingVertex(const HamiltonPath& path) {
   }
 
   return free_net;
+}
+
+std::vector<Edge> GetEdgesOf(const Path& path) {
+  auto edges = std::vector<Edge>{};
+  auto free_nets_of_head = FindFreeNets(*path.head);
+  edges.emplace_back(free_nets_of_head.p.front(), free_nets_of_head.n.front());
+  for (auto curr = path.head; curr->next /* the tail is excluded */;
+       curr = curr->next) {
+    assert(curr->edge_to_next.first && curr->edge_to_next.second);
+    edges.emplace_back(curr->vertex.first->GetGate(),
+                       curr->vertex.second->GetGate());
+    edges.push_back(curr->edge_to_next);
+  }
+  edges.emplace_back(path.tail->vertex.first->GetGate(),
+                     path.tail->vertex.second->GetGate());
+  auto free_nets_of_tail = FindFreeNets(*path.tail);
+  // The use of "back" instead of "front" is due to the possibility that the
+  // tail may be the same as the head. Using "front" could result in the same
+  // net being used twice. However, this is likely to be unreliable, as the
+  // ordering has no guarantee.
+  edges.emplace_back(free_nets_of_tail.p.back(), free_nets_of_tail.n.back());
+  return edges;
 }
 
 std::vector<Edge> GetEdgesOf(const HamiltonPath& path) {

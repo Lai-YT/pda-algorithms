@@ -47,7 +47,7 @@ int main(int argc, char const* argv[]) {
 #endif
 
   auto path_finder = PathFinder{circuit};
-  auto [path] = path_finder.FindPath();
+  auto [path, edges] = path_finder.FindPath();
 
   // // The first line gives the total HPWL of all nets in the SPICE netlist.
   // std::cout << hpwl << std::endl;
@@ -62,14 +62,14 @@ int main(int argc, char const* argv[]) {
     prev_p_mos = p;
   }
   std::cout << std::endl;
-  // auto prev_p_net = edges.front().first;
-  // for (const auto& [p, _] : edges) {
-  //   if (p->GetName() != prev_p_net->GetName() || p->GetName() != "Dummy") {
-  //     std::cout << p->GetName() << " ";
-  //   }
-  //   prev_p_net = p;
-  // }
-  // std::cout << std::endl;
+  auto prev_p_net = edges.front().first;
+  for (const auto& [p, _] : edges) {
+    if (p->GetName() != prev_p_net->GetName() || p->GetName() != "Dummy") {
+      std::cout << p->GetName() << " ";
+    }
+    prev_p_net = p;
+  }
+  std::cout << std::endl;
   // The fourth and fifth lines shows the Euler path of the NMOS network in
   // terms of instance names and net names, respectively.
   auto prev_n_mos = path.head->vertex.second;
@@ -80,14 +80,14 @@ int main(int argc, char const* argv[]) {
     }
     prev_n_mos = n;
   }
-  // std::cout << std::endl;
-  // auto prev_n_net = edges.front().second;
-  // for (const auto& [_, n] : edges) {
-  //   if (n->GetName() != prev_n_net->GetName() || n->GetName() != "Dummy") {
-  //     std::cout << n->GetName() << " ";
-  //   }
-  //   prev_n_net = n;
-  // }
+  std::cout << std::endl;
+  auto prev_n_net = edges.front().second;
+  for (const auto& [_, n] : edges) {
+    if (n->GetName() != prev_n_net->GetName() || n->GetName() != "Dummy") {
+      std::cout << n->GetName() << " ";
+    }
+    prev_n_net = n;
+  }
   // // No end-of-file newline.
 
   return 0;

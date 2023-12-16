@@ -46,6 +46,9 @@ struct Path {
   Path& operator=(Path&& other) noexcept = default;
 };
 
+#ifdef DEBUG
+void PrintPath(const Path& path);
+#endif
 }  // namespace euler
 
 #endif  // EULER_PATH_PATH_H_

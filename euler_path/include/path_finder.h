@@ -33,7 +33,7 @@ class PathFinder {
   /// for each pair.
   /// @return The Hamiltonian path of the MOS, the corresponding net connection,
   /// and the HPWL.
-  std::tuple<Path> FindPath();
+  std::tuple<Path, std::vector<Edge>> FindPath();
 
   PathFinder(const std::shared_ptr<Circuit>& circuit) : circuit_{circuit} {}
 

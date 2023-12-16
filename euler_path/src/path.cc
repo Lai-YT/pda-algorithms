@@ -1,6 +1,13 @@
 #include "path.h"
 
-using namespace euler;
+#ifdef DEBUG
+#include <iostream>
+
+#include "circuit.h"
+#include "mos.h"
+#endif
+
+namespace euler {
 
 Path::Path(const Path& other) {
   *this = other;
@@ -27,3 +34,24 @@ Path& Path::operator=(const Path& other) {
   tail = this_curr;
   return *this;
 }
+
+#ifdef DEBUG
+void PrintPath(const Path& path) {
+  for (auto curr = path.head; curr; curr = curr->next) {
+    std::cerr << "[V] " << curr->vertex.first->GetName() << " ";
+    if (curr->next) {
+      std::cerr << "[E] " << curr->edge_to_next.first->GetName() << " ";
+    }
+  }
+  std::cerr << std::endl;
+  for (auto curr = path.head; curr; curr = curr->next) {
+    std::cerr << "[V] " << curr->vertex.second->GetName() << " ";
+    if (curr->next) {
+      std::cerr << "[E] " << curr->edge_to_next.second->GetName() << " ";
+    }
+  }
+  std::cerr << std::endl;
+}
+#endif
+
+}  // namespace euler
