@@ -519,8 +519,10 @@ double PathFinder::CalculateHpwl_(const HamiltonPath& path) const {
           = decltype(idx_in_p){std::min(idx_in_p.front(), idx_in_n.front()),
                                std::max(idx_in_p.front(), idx_in_n.front())};
       hpwl += HorizontalWidthOf(augmented_idx) + vertical_wire_length;
-      adjustment
-          = IsCoveringTheEnd(augmented_idx) + IsCoveringTheStart(augmented_idx);
+      adjustment = HorizontalWidthOf(augmented_idx) == 0
+                       ? 0
+                       : IsCoveringTheEnd(augmented_idx)
+                             + IsCoveringTheStart(augmented_idx);
     } else if (idx_in_p.size() > 1 && idx_in_n.size() == 1) {
       // (2) P MOS has the net at multiple points, but N MOS has the net at a
       // single point. Treat them as all in the P type + vertical wire length.
