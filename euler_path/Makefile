@@ -3,6 +3,11 @@ CXX := g++
 CC = $(CXX)
 CXXFLAGS = -g3 -std=c++17 -Wall -MMD -Iinclude
 CFLAGS = $(CXXFLAGS)
+LEX = flex
+# C++ features are used, yacc doesn't suffice
+YACC = bison
+# -d: generate header with default name
+YFLAGS = --debug -d
 
 # Note that lex.yy.cpp is excluded deliberately, as "lex.yy.cc" is considered a
 # header file (it's included by "y.tab.cc").
@@ -10,7 +15,7 @@ OBJS := $(shell find . -name "*.cc" ! -name "y.tab.cc" ! -name "lex.yy.cc" ) y.t
 OBJS := $(OBJS:.cc=.o)
 DEPS = $(OBJS:.o=.d)
 
-.PHONY: all clean release debug assertion profile help iwyu
+.PHONY: all clean release debug assertion profile help iwyu lexer parser
 
 all: $(TARGET)
 
@@ -39,6 +44,12 @@ iwyu: clean
 
 main.o: %.o: %.cc y.tab.hh
 
+lexer: lexer.l
+	$(LEX) -o lex.yy.cc $<
+
+parser: parser.y lex.yy.cc
+	$(YACC) $(YFLAGS) $< -o y.tab.cc
+
 clean:
 	rm -rf *.o $(TARGET) $(OBJS) $(DEPS)
 
@@ -46,6 +57,8 @@ help:
 	@echo "$(TARGET)"
 	@echo
 	@echo "Target rules:"
+	@echo "    lexer      - Generates lexer file (requires Flex)"
+	@echo "    parser     - Generates parser file (requires Bison)"
 	@echo "    release    - Compiles and generates optimized binary file"
 	@echo "    debug      - Compiles and generates binary file with"
 	@echo "                 debug messages and less optimizations"
