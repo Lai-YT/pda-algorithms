@@ -526,6 +526,7 @@ double PathFinder::CalculateHpwl_(const HamiltonPath& path) const {
       // single point. Treat them as all in the P type + vertical wire length.
       auto augmented_idx_in_p = idx_in_p;
       augmented_idx_in_p.push_back(idx_in_n.front());
+      std::sort(augmented_idx_in_p.begin(), augmented_idx_in_p.end());
       hpwl += HorizontalWidthOf(augmented_idx_in_p) + vertical_wire_length;
       adjustment = IsCoveringTheEnd(augmented_idx_in_p)
                    + IsCoveringTheStart(augmented_idx_in_p);
@@ -535,6 +536,7 @@ double PathFinder::CalculateHpwl_(const HamiltonPath& path) const {
       // length.
       auto augmented_idx_in_n = idx_in_n;
       augmented_idx_in_n.push_back(idx_in_p.front());
+      std::sort(augmented_idx_in_n.begin(), augmented_idx_in_n.end());
       hpwl += HorizontalWidthOf(augmented_idx_in_n) + vertical_wire_length;
       adjustment = IsCoveringTheEnd(augmented_idx_in_n)
                    + IsCoveringTheStart(augmented_idx_in_n);
