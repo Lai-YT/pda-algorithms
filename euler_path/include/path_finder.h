@@ -19,7 +19,6 @@ struct Path;
 using Vertex = std::pair<std::shared_ptr<Mos>, std::shared_ptr<Mos>>;
 using Edge = std::pair<std::shared_ptr<Net>, std::shared_ptr<Net>>;
 using Neighbors = std::vector<Vertex>;
-using HamiltonPath = std::vector<Vertex>;
 using Graph = std::map<Vertex, Neighbors>;
 
 class PathFinder {

@@ -3,7 +3,6 @@
 
 #include <memory>
 #include <utility>
-#include <vector>
 
 #include "path_finder.h"
 

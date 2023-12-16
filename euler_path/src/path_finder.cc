@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
-#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
@@ -16,9 +15,6 @@
 
 #ifdef DEBUG
 #include <string>
-#endif
-#ifndef NDEBUG
-#include <numeric>
 #endif
 
 using namespace euler;
@@ -37,10 +33,6 @@ namespace {
 bool IsNeighbor(const Vertex& a, const Vertex& b);
 bool IsNeighbor(const Mos& a, const Mos& b);
 
-/// @note In case of multiply connections, we choose one in unspecified order.
-Edge FindEdgeToNeighbor(const Vertex& a, const Vertex& b);
-std::shared_ptr<Net> FindEdgeToNeighbor(const Mos& a, const Mos& b);
-
 /// @brief To connect two paths, we add a dummy to end of the first path, and a
 /// dummy to the start of the second path. These 2 dummies are then connected
 /// with a dummy net.
@@ -52,18 +44,6 @@ std::shared_ptr<Net> FindEdgeToNeighbor(const Mos& a, const Mos& b);
 /// as either the starting or ending point of the path, we choose one pin to
 /// exclude.
 Path ConnectHamiltonPathOfSubgraphsWithDummy(const std::vector<Path>&);
-
-/// @brief If the length of the Hamilton path is 1, nets other than the gate are
-/// free. In this case, there are 2 free edges, one of them is returned.
-/// Otherwise, the free net is the one that is not used as a connection between
-/// the next vertex and the gate.
-Edge FindFreeNetOfStartingVertex(const HamiltonPath&);
-
-/// @brief If the length of the Hamilton path is 1, nets other than the gate are
-/// free. In this case, there are 2 free edges, one of them is returned.
-/// Otherwise, the free net is the one that is not used as a connection between
-/// the previous vertex and the gate.
-Edge FindFreeNetOfEndingVertex(const HamiltonPath&);
 
 /// @note The number of free nets in P and N MOS may not be the same.
 struct FreeNets {
@@ -77,7 +57,6 @@ FreeNets FindFreeNets(const PathFragment& fragment);
 
 /// @return The nets that connect the MOS in the Hamilton path, including the
 /// gate connections of the MOS.
-std::vector<Edge> GetEdgesOf(const HamiltonPath&);
 std::vector<Edge> GetEdgesOf(const Path&);
 
 /// @note For HPWL calculation, we need to know the Hamilton distance between
@@ -592,25 +571,6 @@ bool IsNeighbor(const Mos& a, const Mos& b) {
          || a.GetDrain() == b.GetSource() || a.GetSource() == b.GetDrain();
 }
 
-Edge FindEdgeToNeighbor(const Vertex& a, const Vertex& b) {
-  return {FindEdgeToNeighbor(*a.first, *b.first),
-          FindEdgeToNeighbor(*a.second, *b.second)};
-}
-
-std::shared_ptr<Net> FindEdgeToNeighbor(const Mos& a, const Mos& b) {
-  if (!IsNeighbor(a, b)) {
-    return nullptr;
-  }
-  if (a.GetDrain() == b.GetDrain() || a.GetDrain() == b.GetSource()) {
-    return a.GetDrain();
-  }
-  if (a.GetSource() == b.GetSource() || a.GetSource() == b.GetDrain()) {
-    return a.GetSource();
-  }
-  assert(false && "Cannot find the net to the neighbor.");
-  return nullptr;
-}
-
 Path ConnectHamiltonPathOfSubgraphsWithDummy(const std::vector<Path>& paths) {
   if (paths.size() == 1) {
     return paths.front();
@@ -666,137 +626,6 @@ Path ConnectHamiltonPathOfSubgraphsWithDummy(const std::vector<Path>& paths) {
   return path;
 }
 
-Edge FindFreeNetOfStartingVertex(const HamiltonPath& path) {
-  // Notice that a net may connect multiple pins, it can then still be free
-  // unless it is used in that many times.
-
-  auto starting_vertex = path.front();
-
-  auto net_count_of_p_most = std::map<std::shared_ptr<Net>, std::size_t>{};
-  for (auto net : NetsOf(*starting_vertex.first)) {
-    ++net_count_of_p_most[net];
-  }
-  auto net_count_of_n_most = std::map<std::shared_ptr<Net>, std::size_t>{};
-  for (auto net : NetsOf(*starting_vertex.second)) {
-    ++net_count_of_n_most[net];
-  }
-
-#ifdef DEBUG
-  std::cerr << "=== Nets of " << starting_vertex.first->GetName()
-            << " ===" << std::endl;
-  for (const auto& [net, count] : net_count_of_p_most) {
-    std::cerr << net->GetName() << " " << count << std::endl;
-  }
-  std::cerr << "=== Nets of " << starting_vertex.second->GetName()
-            << " ===" << std::endl;
-  for (const auto& [net, count] : net_count_of_n_most) {
-    std::cerr << net->GetName() << " " << count << std::endl;
-  }
-#endif
-
-  // Remove gate from the count.
-  --net_count_of_p_most[starting_vertex.first->GetGate()];
-  --net_count_of_n_most[starting_vertex.second->GetGate()];
-  // Remove the connection between the starting vertex and the next vertex.
-  if (path.size() != 1) {
-    auto connection = FindEdgeToNeighbor(starting_vertex, path.at(1));
-    --net_count_of_p_most[connection.first];
-    --net_count_of_n_most[connection.second];
-    assert(std::accumulate(
-               net_count_of_p_most.cbegin(), net_count_of_p_most.cend(), 0,
-               [](auto sum, const auto& pair) { return sum + pair.second; })
-               == 1
-           && "There should be only one free net.");
-    assert(std::accumulate(
-               net_count_of_n_most.cbegin(), net_count_of_n_most.cend(), 0,
-               [](auto sum, const auto& pair) { return sum + pair.second; })
-               == 1
-           && "There should be only one free net.");
-  }
-
-  auto free_net = Edge{};
-  for (const auto& [net, count] : net_count_of_p_most) {
-    if (count == 1) {
-      free_net.first = net;
-      break;
-    }
-  }
-  for (const auto& [net, count] : net_count_of_n_most) {
-    if (count == 1) {
-      free_net.second = net;
-      break;
-    }
-  }
-
-  return free_net;
-}
-
-Edge FindFreeNetOfEndingVertex(const HamiltonPath& path) {
-  // Notice that a net may connect multiple pins, it can then still be free
-  // unless it is used in that many times.
-
-  auto ending_vertex = path.back();
-
-  auto net_count_of_p_most = std::map<std::shared_ptr<Net>, std::size_t>{};
-  for (auto net : NetsOf(*ending_vertex.first)) {
-    ++net_count_of_p_most[net];
-  }
-  auto net_count_of_n_most = std::map<std::shared_ptr<Net>, std::size_t>{};
-  for (auto net : NetsOf(*ending_vertex.second)) {
-    ++net_count_of_n_most[net];
-  }
-
-#ifdef DEBUG
-  std::cerr << "=== Nets of " << ending_vertex.first->GetName()
-            << " ===" << std::endl;
-  for (const auto& [net, count] : net_count_of_p_most) {
-    std::cerr << net->GetName() << " " << count << std::endl;
-  }
-  std::cerr << "=== Nets of " << ending_vertex.second->GetName()
-            << " ===" << std::endl;
-  for (const auto& [net, count] : net_count_of_n_most) {
-    std::cerr << net->GetName() << " " << count << std::endl;
-  }
-#endif
-
-  // Remove gate from the count.
-  --net_count_of_p_most[ending_vertex.first->GetGate()];
-  --net_count_of_n_most[ending_vertex.second->GetGate()];
-  // Remove the connection between the ending vertex and the previous vertex.
-  if (path.size() != 1) {
-    auto connection
-        = FindEdgeToNeighbor(ending_vertex, path.at(path.size() - 2));
-    --net_count_of_p_most[connection.first];
-    --net_count_of_n_most[connection.second];
-    assert(std::accumulate(
-               net_count_of_p_most.cbegin(), net_count_of_p_most.cend(), 0,
-               [](auto sum, const auto& pair) { return sum + pair.second; })
-               == 1
-           && "There should be only one free net.");
-    assert(std::accumulate(
-               net_count_of_n_most.cbegin(), net_count_of_n_most.cend(), 0,
-               [](auto sum, const auto& pair) { return sum + pair.second; })
-               == 1
-           && "There should be only one free net.");
-  }
-
-  auto free_net = Edge{};
-  for (const auto& [net, count] : net_count_of_p_most) {
-    if (count == 1) {
-      free_net.first = net;
-      break;
-    }
-  }
-  for (const auto& [net, count] : net_count_of_n_most) {
-    if (count == 1) {
-      free_net.second = net;
-      break;
-    }
-  }
-
-  return free_net;
-}
-
 std::vector<Edge> GetEdgesOf(const Path& path) {
   auto edges = std::vector<Edge>{};
   auto free_nets_of_head = FindFreeNets(*path.head);
@@ -816,20 +645,6 @@ std::vector<Edge> GetEdgesOf(const Path& path) {
   // net being used twice. However, this is likely to be unreliable, as the
   // ordering has no guarantee.
   edges.emplace_back(free_nets_of_tail.p.back(), free_nets_of_tail.n.back());
-  return edges;
-}
-
-std::vector<Edge> GetEdgesOf(const HamiltonPath& path) {
-  auto edges = std::vector<Edge>{};
-  edges.push_back(FindFreeNetOfStartingVertex(path));
-  edges.emplace_back(path.front().first->GetGate(),
-                     path.front().second->GetGate());
-  for (auto i = std::size_t{1}; i < path.size(); i++) {
-    edges.push_back(FindEdgeToNeighbor(path.at(i - 1), path.at(i)));
-    edges.emplace_back(path.at(i).first->GetGate(),
-                       path.at(i).second->GetGate());
-  }
-  edges.push_back(FindFreeNetOfEndingVertex(path));
   return edges;
 }
 
