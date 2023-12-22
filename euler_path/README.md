@@ -32,14 +32,14 @@ If you're using a different compiler, you can specify it like this:
 make release CXX=<compiler>
 ```
 
-The executable will be located in the root of the subproject and named `Lab3`.
+The executable will be located in the root of the subproject and named `EulerPath`.
 
 ## 🎈 Usage
 
 To run the program, you can use the following command:
 
 ```
-Usage: ./Lab3 IN OUT
+Usage: ./EulerPath IN OUT
 
 Options:
     -h, --help       Prints this help message

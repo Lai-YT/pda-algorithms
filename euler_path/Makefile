@@ -1,4 +1,4 @@
-TARGET := Lab3
+TARGET := EulerPath
 CXX := g++
 CC = $(CXX)
 CXXFLAGS = -g3 -std=c++17 -Wall -MMD -Iinclude
