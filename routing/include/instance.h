@@ -14,6 +14,9 @@ using NetId = unsigned;
 using NetIds = std::vector<NetId>;
 using Interval = std::pair<std::size_t, std::size_t>;
 
+/// @brief 0 is used to indicate an empty slot.
+constexpr auto kEmptySlot = NetId{0};
+
 struct Instance {
   /// @brief The index is mapped to the distance from the innermost boundary.
   /// @example

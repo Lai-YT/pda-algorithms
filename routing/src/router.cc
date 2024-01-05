@@ -41,6 +41,8 @@ void Router::ConstructHorizontalConstraintGraph_() {
     }
   }
   // Sort the intervals by the start of the interval.
+  // 0 is skipped. It's fine that we've take 0 into account in the previous
+  // step.
   for (auto net_id = 1u; net_id <= number_of_nets; net_id++) {
     horizontal_constraint_graph_.emplace_back(interval_of_nets.at(net_id),
                                               net_id);
@@ -70,6 +72,9 @@ void Router::ConstructVerticalConstraintGraph_() {
   for (auto i = std::size_t{0}, e = instance_.top_net_ids.size(); i < e; i++) {
     auto top_net_id = instance_.top_net_ids.at(i);
     auto bottom_net_id = instance_.bottom_net_ids.at(i);
+    if (top_net_id == kEmptySlot || bottom_net_id == kEmptySlot) {
+      continue;
+    }
     if (top_net_id != bottom_net_id) {
       // NOTE: This approach of avoiding duplicates may be inefficient, but the
       // number of parents is small, so it should be fine.
@@ -87,11 +92,10 @@ void Router::ConstructVerticalConstraintGraph_() {
   }
 #ifdef DEBUG
   std::cout << "VERTICAL CONSTRAINT GRAPH\n";
-  for (auto i = std::size_t{0}, e = vertical_constraint_graph_.size(); i < e;
-       i++) {
-    std::cout << i << ": ";
-    for (auto net_id : vertical_constraint_graph_.at(i)) {
-      std::cout << net_id << " ";
+  for (auto net_id = 1u; net_id <= number_of_nets; net_id++) {
+    std::cout << net_id << ": ";
+    for (auto parent : vertical_constraint_graph_.at(net_id)) {
+      std::cout << parent << " ";
     }
     std::cout << '\n';
   }
