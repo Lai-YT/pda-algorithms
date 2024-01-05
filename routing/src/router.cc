@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <unordered_map>
 
 #ifdef DEBUG
 #include <iostream>
@@ -21,32 +20,37 @@ void Router::ConstructHorizontalConstraintGraph_() {
   // The horizontal constraint regardless of whether the net is at the top or
   // the bottom. For each net id, find its smallest and largest index in the mix
   // top and bottom boundaries.
-  // TODO: The id of the nets are guaranteed to be positive (0 is not a net id)
-  // and consecutive. Thus, we can use a vector instead of a map.
-  auto interval_map = std::unordered_map<NetId, Interval>{};
+
+  // The id of the nets are guaranteed to be positive (0 is not a net id) and
+  // consecutive. Thus, the largest net id is the number of nets.
+  auto number_of_nets
+      = std::max(*std::max_element(instance_.top_net_ids.begin(),
+                                   instance_.top_net_ids.end()),
+                 *std::max_element(instance_.bottom_net_ids.begin(),
+                                   instance_.bottom_net_ids.end()));
+
+  auto interval_of_nets
+      = std::vector<Interval>(number_of_nets + 1 /* index 0 is not used */);
+  std::fill(interval_of_nets.begin(), interval_of_nets.end(),
+            Interval{instance_.top_boundaries.size() - 1, 0});
   for (auto i = std::size_t{0}, e = instance_.top_net_ids.size(); i < e; i++) {
     {
       auto top_net_id = instance_.top_net_ids.at(i);
-      if (!interval_map.contains(top_net_id)) {
-        interval_map[top_net_id] = {e - 1, 0};
-      }
-      auto& interval = interval_map[top_net_id];
+      auto& interval = interval_of_nets.at(top_net_id);
       interval.first = std::min(interval.first, i);
       interval.second = std::max(interval.second, i);
     }
     {
       auto bottom_net_id = instance_.bottom_net_ids.at(i);
-      if (!interval_map.contains(bottom_net_id)) {
-        interval_map[bottom_net_id] = {e - 1, 0};
-      }
-      auto& interval = interval_map[bottom_net_id];
+      auto& interval = interval_of_nets.at(bottom_net_id);
       interval.first = std::min(interval.first, i);
       interval.second = std::max(interval.second, i);
     }
   }
   // Sort the intervals by the start of the interval.
-  for (const auto& [net_id, interval] : interval_map) {
-    horizontal_constraint_graph_.emplace_back(interval, net_id);
+  for (auto net_id = 1u; net_id <= number_of_nets; net_id++) {
+    horizontal_constraint_graph_.emplace_back(interval_of_nets.at(net_id),
+                                              net_id);
   }
   std::sort(horizontal_constraint_graph_.begin(),
             horizontal_constraint_graph_.end(),
