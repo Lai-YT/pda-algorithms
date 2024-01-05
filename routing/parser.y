@@ -2,8 +2,22 @@
 #include <iostream>
 #include <string>
 
+#include "instance.h"
 #include "lex.yy.cc"
+
+extern Instance instance;
 %}
+
+%code requires {
+  #include <array>
+  #include <tuple>
+  #include <utility>
+  #include <vector>
+
+  #include "instance.h"
+
+  using namespace routing;
+}
 
 %skeleton "lalr1.cc"
 %require "3.2"
@@ -28,7 +42,11 @@
 %token <int> NUMBER
 
 %nterm instance
-%nterm boundary boundaries net_ids
+%nterm <std::tuple<BoundaryKind, unsigned /* the distance from the innermost boundary */, Interval>> boundary
+  /* Notice that there may be multiple intervals having the same distance from the innermost boundary. */
+%nterm <std::array<std::vector<std::vector<Interval>>, 2 /* top, bottom */>> boundaries
+%nterm <Interval> interval
+%nterm <NetIds> net_ids
 
 %token EOL
 %token EOF 0
@@ -39,22 +57,64 @@ instance:
   boundaries
   net_ids EOL
   net_ids EOL
-  EOF
+  EOF {
+    instance = Instance{
+      .top_boundaries = $1.at(BoundaryKind::kTop),
+      .bottom_boundaries = $1.at(BoundaryKind::kBottom),
+      .top_net_ids = $2,
+      .bottom_net_ids = $4,
+    };
+  }
   ;
 
 boundaries:
-  boundary
-  | boundaries boundary
+  boundary {
+    auto boundaries = std::array<std::vector<std::vector<Interval>>, 2>{};
+    auto [kind, dist, new_interval] = $1;
+    if (dist >= boundaries.at(kind).size()) {
+      boundaries.at(kind).resize(dist + 1);
+    }
+    // These nets goes to the same boundary, append them.
+    auto& boundary_with_dist = boundaries.at(kind).at(dist);
+    boundary_with_dist.push_back(new_interval);
+    $$ = boundaries;
+  }
+  | boundaries boundary {
+    auto boundaries = $1;
+    auto [kind, dist, new_interval] = $2;
+    if (dist >= boundaries.at(kind).size()) {
+      boundaries.at(kind).resize(dist + 1);
+    }
+    // These nets goes to the same boundary, append them.
+    auto& boundary_with_dist = boundaries.at(kind).at(dist);
+    boundary_with_dist.push_back(new_interval);
+    $$ = boundaries;
+  }
   ;
 
 boundary:
-  TOP net_ids EOL
-  | BOTTOM net_ids EOL
+  TOP interval EOL {
+    $$ = std::make_tuple(BoundaryKind::kTop, $1, $2);
+  }
+  | BOTTOM interval EOL {
+    $$ = std::make_tuple(BoundaryKind::kBottom, $1, $2);
+  }
   ;
 
 net_ids:
-  NUMBER
-  | net_ids NUMBER
+  NUMBER {
+    $$ = NetIds{$1};
+  }
+  | net_ids NUMBER {
+    $1.push_back($2);
+    $$ = $1;
+  }
+  ;
+
+interval:
+  NUMBER NUMBER {
+    $$ = Interval{$1, $2};
+  }
   ;
 
 

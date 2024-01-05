@@ -1,7 +1,7 @@
 TARGET := Lab4
 CXX := g++
 CC = $(CXX)
-CXXFLAGS = -g3 -std=c++17 -Wall -MMD -Iinclude
+CXXFLAGS = -g3 -std=c++2a -Wall -MMD -Iinclude -Wpedantic -Wextra
 CFLAGS = $(CXXFLAGS)
 LEX = flex
 # C++ features are used, yacc doesn't suffice
