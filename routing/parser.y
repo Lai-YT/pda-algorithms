@@ -39,7 +39,7 @@ extern Instance instance;
 %define parse.lac full
 
 %token <int> TOP BOTTOM
-%token <int> NUMBER
+%token <unsigned> POS_NUMBER
 
 %nterm instance
 %nterm <std::tuple<BoundaryKind, unsigned /* the distance from the innermost boundary */, Interval>> boundary
@@ -102,17 +102,17 @@ boundary:
   ;
 
 net_ids:
-  NUMBER {
+  POS_NUMBER {
     $$ = NetIds{$1};
   }
-  | net_ids NUMBER {
+  | net_ids POS_NUMBER {
     $1.push_back($2);
     $$ = $1;
   }
   ;
 
 interval:
-  NUMBER NUMBER {
+  POS_NUMBER POS_NUMBER {
     $$ = Interval{$1, $2};
   }
   ;

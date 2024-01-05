@@ -10,9 +10,9 @@ enum BoundaryKind {
   kBottom = 1,
 };
 
-using NetId = int;
+using NetId = unsigned;
 using NetIds = std::vector<NetId>;
-using Interval = std::pair<int, int>;
+using Interval = std::pair<std::size_t, std::size_t>;
 
 struct Instance {
   /// @brief The index is mapped to the distance from the innermost boundary.

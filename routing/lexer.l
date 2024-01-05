@@ -22,9 +22,9 @@
 #define LINENO (yylineno - 1)
 %}
 
-NUMBER ([1-9][0-9]*)|0
-TOP T{NUMBER}
-BOTTOM B{NUMBER}
+POS_NUMBER ([1-9][0-9]*)|0
+TOP T{POS_NUMBER}
+BOTTOM B{POS_NUMBER}
 
 %%
 
@@ -35,7 +35,7 @@ BOTTOM B{NUMBER}
 
   /* numbers */
 
-{NUMBER} { return yy::parser::make_NUMBER(std::stoi(yytext)); }
+{POS_NUMBER} { return yy::parser::make_POS_NUMBER(std::stoul(yytext)); }
 
   /* special symbols */
 
