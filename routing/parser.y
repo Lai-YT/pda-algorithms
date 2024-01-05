@@ -57,8 +57,7 @@ extern Instance instance;
 instance:
   boundaries
   net_ids EOL
-  net_ids EOL
-  EOF {
+  net_ids EOF {
     instance = Instance{
       .top_boundaries = $1.at(BoundaryKind::kTop),
       .bottom_boundaries = $1.at(BoundaryKind::kBottom),
