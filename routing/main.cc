@@ -4,6 +4,7 @@
 
 #include "arg.h"
 #include "instance.h"
+#include "router.h"
 #include "y.tab.hh"
 
 #ifdef DEBUG
@@ -65,6 +66,9 @@ int main(int argc, char* argv[]) {
   }
   std::cout << '\n';
 #endif
+
+  auto router = Router{instance};
+  auto result = router.Route();
 
   auto out = std::ofstream{arg.out};
 
