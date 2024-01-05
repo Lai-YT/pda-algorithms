@@ -39,34 +39,34 @@ int main(int argc, char* argv[]) {
   }
 
 #ifdef DEBUG
-  std::cout << "TOP\n";
+  std::cerr << "TOP\n";
   for (auto i = std::size_t{0}; i < instance.top_boundaries.size(); i++) {
-    std::cout << i << ": ";
+    std::cerr << i << ": ";
     for (auto interval : instance.top_boundaries.at(i)) {
-      std::cout << "(" << interval.first << ", " << interval.second << ")"
+      std::cerr << "(" << interval.first << ", " << interval.second << ")"
                 << " ";
     }
-    std::cout << '\n';
+    std::cerr << '\n';
   }
-  std::cout << "BOTTOM\n";
+  std::cerr << "BOTTOM\n";
   for (auto i = std::size_t{0}; i < instance.bottom_boundaries.size(); i++) {
-    std::cout << i << ": ";
+    std::cerr << i << ": ";
     for (auto interval : instance.bottom_boundaries.at(i)) {
-      std::cout << "(" << interval.first << ", " << interval.second << ")"
+      std::cerr << "(" << interval.first << ", " << interval.second << ")"
                 << " ";
     }
-    std::cout << '\n';
+    std::cerr << '\n';
   }
-  std::cout << "TOP NETS\n";
+  std::cerr << "TOP NETS\n";
   for (auto net_idx : instance.top_net_ids) {
-    std::cout << net_idx << " ";
+    std::cerr << net_idx << " ";
   }
-  std::cout << '\n';
-  std::cout << "BOTTOM NETS\n";
+  std::cerr << '\n';
+  std::cerr << "BOTTOM NETS\n";
   for (auto net_idx : instance.bottom_net_ids) {
-    std::cout << net_idx << " ";
+    std::cerr << net_idx << " ";
   }
-  std::cout << '\n';
+  std::cerr << '\n';
 #endif
 
   auto router = Router{instance};

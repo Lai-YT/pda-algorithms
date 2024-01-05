@@ -32,7 +32,7 @@ Result Router::Route() {
   auto top_tracks = std::vector<std::vector<std::tuple<Interval, NetId>>>(
       instance_.top_boundaries.size() - 1);
 #ifdef DEBUG
-  std::cout << "TOP TRACKS\n";
+  std::cerr << "TOP TRACKS\n";
 #endif
   for (auto dist = instance_.top_boundaries.size() - 1;
        dist > 0 /* 0 is the general case */; dist--) {
@@ -64,15 +64,15 @@ Result Router::Route() {
     }
 #ifdef DEBUG
     // Routed at dist - 1.
-    std::cout << "Top intervals " << dist << '\t';
+    std::cerr << "Top intervals " << dist << '\t';
     for (const auto& interval : top_rectilinear_boundaries) {
-      std::cout << "(" << interval.first << ", " << interval.second << ") ";
+      std::cerr << "(" << interval.first << ", " << interval.second << ") ";
     }
-    std::cout << '\n';
+    std::cerr << '\n';
 #endif
     auto watermark = -1;
 #ifdef DEBUG
-    std::cout << "TOP TRACK " << dist - 1 << '\n';
+    std::cerr << "TOP TRACK " << dist - 1 << '\n';
 #endif
     for (const auto& [interval, net_id] : horizontal_constraint_graph_) {
       if (routed.at(net_id)) {
@@ -87,7 +87,7 @@ Result Router::Route() {
               if (!routed.at(parent)) {
                 all_parents_routed = false;
 #ifdef DEBUG
-                std::cout << "Net " << net_id << " has parent " << parent
+                std::cerr << "Net " << net_id << " has parent " << parent
                           << " not routed\n";
 #endif
                 break;
@@ -105,7 +105,7 @@ Result Router::Route() {
     }
 #ifdef DEBUG
     for (const auto& [interval, net_id] : top_tracks.at(dist - 1)) {
-      std::cout << "(" << interval.first << ", " << interval.second << ")\t"
+      std::cerr << "(" << interval.first << ", " << interval.second << ")\t"
                 << net_id << '\n';
     }
 #endif
@@ -134,7 +134,7 @@ Result Router::Route() {
   // On each track, several nets may be routed.
   auto tracks = std::vector<std::vector<std::tuple<Interval, NetId>>>{};
 #ifdef DEBUG
-  std::cout << "TRACKS\n";
+  std::cerr << "TRACKS\n";
 #endif
   while (number_of_routed_nets < number_of_nets) {
     assert(tracks.size() < number_of_nets
@@ -142,7 +142,7 @@ Result Router::Route() {
     tracks.emplace_back();
     auto watermark = -1;
 #ifdef DEBUG
-    std::cout << "TRACK " << tracks.size() << '\n';
+    std::cerr << "TRACK " << tracks.size() << '\n';
 #endif
     for (const auto& [interval, net_id] : horizontal_constraint_graph_) {
       if (routed.at(net_id)) {
@@ -155,7 +155,7 @@ Result Router::Route() {
           if (!routed.at(parent)) {
             all_parents_routed = false;
 #ifdef DEBUG
-            std::cout << "Net " << net_id << " has parent " << parent
+            std::cerr << "Net " << net_id << " has parent " << parent
                       << " not routed\n";
 #endif
             break;
@@ -171,7 +171,7 @@ Result Router::Route() {
     }
 #ifdef DEBUG
     for (const auto& [interval, net_id] : tracks.back()) {
-      std::cout << "(" << interval.first << ", " << interval.second << ")\t"
+      std::cerr << "(" << interval.first << ", " << interval.second << ")\t"
                 << net_id << '\n';
     }
 #endif
@@ -220,9 +220,9 @@ void Router::ConstructHorizontalConstraintGraph_() {
               return std::get<0>(lhs).first < std::get<0>(rhs).first;
             });
 #ifdef DEBUG
-  std::cout << "HORIZONTAL CONSTRAINT GRAPH\n";
+  std::cerr << "HORIZONTAL CONSTRAINT GRAPH\n";
   for (const auto& [interval, net_id] : horizontal_constraint_graph_) {
-    std::cout << "(" << interval.first << ", " << interval.second << ")\t"
+    std::cerr << "(" << interval.first << ", " << interval.second << ")\t"
               << net_id << '\n';
   }
 #endif
@@ -258,13 +258,13 @@ void Router::ConstructVerticalConstraintGraph_() {
     }
   }
 #ifdef DEBUG
-  std::cout << "VERTICAL CONSTRAINT GRAPH\n";
+  std::cerr << "VERTICAL CONSTRAINT GRAPH\n";
   for (auto net_id = 1u; net_id <= number_of_nets; net_id++) {
-    std::cout << net_id << ": ";
+    std::cerr << net_id << ": ";
     for (auto parent : vertical_constraint_graph_.at(net_id)) {
-      std::cout << parent << " ";
+      std::cerr << parent << " ";
     }
-    std::cout << '\n';
+    std::cerr << '\n';
   }
 #endif
 }
