@@ -20,6 +20,8 @@ class Router {
   Instance instance_;
   /// @note Is sorted by the start of the interval.
   std::vector<std::tuple<Interval, NetId>> horizontal_constraint_graph_{};
+  /// @note The index of the vector is the net id.
+  std::vector<std::vector<NetId>> vertical_constraint_graph_{};
 
   void ConstructHorizontalConstraintGraph_();
   void ConstructVerticalConstraintGraph_();
