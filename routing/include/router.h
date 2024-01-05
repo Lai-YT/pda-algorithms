@@ -25,6 +25,8 @@ class Router {
 
   void ConstructHorizontalConstraintGraph_();
   void ConstructVerticalConstraintGraph_();
+
+  unsigned NumberOfNets_() const;
 };
 
 }  // namespace routing

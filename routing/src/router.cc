@@ -21,14 +21,7 @@ void Router::ConstructHorizontalConstraintGraph_() {
   // the bottom. For each net id, find its smallest and largest index in the mix
   // top and bottom boundaries.
 
-  // The id of the nets are guaranteed to be positive (0 is not a net id) and
-  // consecutive. Thus, the largest net id is the number of nets.
-  auto number_of_nets
-      = std::max(*std::max_element(instance_.top_net_ids.begin(),
-                                   instance_.top_net_ids.end()),
-                 *std::max_element(instance_.bottom_net_ids.begin(),
-                                   instance_.bottom_net_ids.end()));
-
+  auto number_of_nets = NumberOfNets_();
   auto interval_of_nets
       = std::vector<Interval>(number_of_nets + 1 /* index 0 is not used */);
   std::fill(interval_of_nets.begin(), interval_of_nets.end(),
@@ -71,13 +64,7 @@ void Router::ConstructVerticalConstraintGraph_() {
   // of the bottom boundary, m be the net at index i of the top boundary. If n
   // != m, then m is a parent of n.
 
-  // The id of the nets are guaranteed to be positive (0 is not a net id) and
-  // consecutive. Thus, the largest net id is the number of nets.
-  auto number_of_nets
-      = std::max(*std::max_element(instance_.top_net_ids.begin(),
-                                   instance_.top_net_ids.end()),
-                 *std::max_element(instance_.bottom_net_ids.begin(),
-                                   instance_.bottom_net_ids.end()));
+  auto number_of_nets = NumberOfNets_();
   vertical_constraint_graph_.resize(number_of_nets
                                     + 1 /* index 0 is not used */);
   for (auto i = std::size_t{0}, e = instance_.top_net_ids.size(); i < e; i++) {
@@ -109,4 +96,13 @@ void Router::ConstructVerticalConstraintGraph_() {
     std::cout << '\n';
   }
 #endif
+}
+
+unsigned Router::NumberOfNets_() const {
+  // The id of the nets are guaranteed to be positive (0 is not a net id) and
+  // consecutive. Thus, the largest net id is the number of nets.
+  return std::max(*std::max_element(instance_.top_net_ids.begin(),
+                                    instance_.top_net_ids.end()),
+                  *std::max_element(instance_.bottom_net_ids.begin(),
+                                    instance_.bottom_net_ids.end()));
 }
