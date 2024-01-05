@@ -4,6 +4,8 @@
 
 #include "arg.h"
 #include "instance.h"
+#include "output_formatter.h"
+#include "result.h"
 #include "router.h"
 #include "y.tab.hh"
 
@@ -71,6 +73,8 @@ int main(int argc, char* argv[]) {
   auto result = router.Route();
 
   auto out = std::ofstream{arg.out};
+  auto output_formatter = OutputFormatter{out, result};
+  output_formatter.Out();
 
   return 0;
 }

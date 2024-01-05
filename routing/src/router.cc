@@ -176,7 +176,11 @@ Result Router::Route() {
     }
 #endif
   }
-  return Result{};
+  return Result{
+      .top_tracks = top_tracks,
+      .tracks = tracks,
+      .bottom_tracks = {},
+  };
 }
 
 void Router::ConstructHorizontalConstraintGraph_() {
