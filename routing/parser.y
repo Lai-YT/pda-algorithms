@@ -1,4 +1,5 @@
 %{
+#include <algorithm>
 #include <iostream>
 #include <string>
 
@@ -64,6 +65,12 @@ instance:
       .top_net_ids = $2,
       .bottom_net_ids = $4,
     };
+    for (auto& boundary : instance.top_boundaries) {
+      std::sort(boundary.begin(), boundary.end());
+    }
+    for (auto& boundary : instance.bottom_boundaries) {
+      std::sort(boundary.begin(), boundary.end());
+    }
   }
   ;
 

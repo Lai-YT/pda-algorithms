@@ -25,6 +25,8 @@ struct Instance {
   /// T0 -----------
   ///  (the channel)
   ///  (bottom boundaries)
+  /// @note The intervals of the same distance are sorted by the start of the
+  /// interval.
   std::vector<std::vector<Interval>> top_boundaries;
   /// @brief The index is mapped to the distance from the innermost boundary.
   /// @example
@@ -33,6 +35,8 @@ struct Instance {
   /// B0 -----------
   /// B1 -----------
   /// B2 -----------
+  /// @note The intervals of the same distance are sorted by the start of the
+  /// interval.
   std::vector<std::vector<Interval>> bottom_boundaries;
   NetIds top_net_ids;
   NetIds bottom_net_ids;
