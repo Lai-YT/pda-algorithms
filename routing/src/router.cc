@@ -21,11 +21,11 @@ void Router::ConstructHorizontalConstraintGraph_() {
   // the bottom. For each net id, find its smallest and largest index in the mix
   // top and bottom boundaries.
 
-  auto number_of_nets = NumberOfNets_();
+  const auto number_of_nets = NumberOfNets_();
   auto interval_of_nets
       = std::vector<Interval>(number_of_nets + 1 /* index 0 is not used */);
   std::fill(interval_of_nets.begin(), interval_of_nets.end(),
-            Interval{instance_.top_boundaries.size() - 1, 0});
+            Interval{instance_.top_net_ids.size() - 1, 0});
   for (auto i = std::size_t{0}, e = instance_.top_net_ids.size(); i < e; i++) {
     {
       auto top_net_id = instance_.top_net_ids.at(i);
