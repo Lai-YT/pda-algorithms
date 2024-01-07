@@ -1,4 +1,9 @@
-Lab1
+# Executables
+Partition
+Floorplan
+EulerPath
+Lab4
+
 *.o
 *.d
 .vscode/
