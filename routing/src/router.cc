@@ -17,74 +17,13 @@ Result Router::Route() {
   ConstructHorizontalConstraintGraph_();
   ConstructVerticalConstraintGraph_();
 
-  const auto number_of_nets = NumberOfNets_();
   auto number_of_routed_nets = 0u;
   auto routed
-      = std::vector<bool>(number_of_nets + 1 /* index 0 is not used */, false);
+      = std::vector<bool>(NumberOfNets_() + 1 /* index 0 is not used */, false);
 
   auto top_tracks = RoutedInTopTrack_(routed, number_of_routed_nets);
   auto bottom_tracks = RoutedInBottomTrack_(routed, number_of_routed_nets);
-
-  // On each track in the channel, first set the watermark to -1, then select
-  // the net with the smallest* start of interval from the horizontal constraint
-  // graph:
-  // (1) if the net is not routed and the watermark is less than the start of
-  //     the interval:
-  //   (a) if all the parents of the net are routed, route the net and set the
-  //       watermark to the end of the interval.
-  //   (b) if not all the parents of the net are routed, skip the net.
-  // (2) if the net is not routed and the watermark is greater than or equal to
-  //     the start of the interval, skip the net.
-  // (3) if the net is routed, skip the net.
-  //  If there's not more nets that are possible to be routed in this track, go
-  //  to the next track.
-  // * From those nets that are not skipped.
-
-  // On each track, several nets may be routed.
-  auto tracks = std::vector<std::vector<std::tuple<Interval, NetId>>>{};
-#ifdef DEBUG
-  std::cerr << "TRACKS\n";
-#endif
-  while (number_of_routed_nets < number_of_nets) {
-    assert(tracks.size() < number_of_nets
-        && "the worst routing result shall not have to use more tracks than the number of nets");
-    tracks.emplace_back();
-    auto watermark = -1;
-#ifdef DEBUG
-    std::cerr << "TRACK " << tracks.size() << '\n';
-#endif
-    for (const auto& [interval, net_id] : horizontal_constraint_graph_) {
-      if (routed.at(net_id)) {
-        continue;
-      }
-      if (watermark == -1
-          || interval.first > static_cast<unsigned>(watermark)) {
-        auto all_parents_routed = true;
-        for (auto parent : vertical_constraint_graph_.at(net_id)) {
-          if (!routed.at(parent)) {
-            all_parents_routed = false;
-#ifdef DEBUG
-            std::cerr << "Net " << net_id << " has parent " << parent
-                      << " not routed\n";
-#endif
-            break;
-          }
-        }
-        if (all_parents_routed) {
-          routed.at(net_id) = true;
-          number_of_routed_nets++;
-          watermark = interval.second;
-          tracks.back().emplace_back(interval, net_id);
-        }
-      }
-    }
-#ifdef DEBUG
-    for (const auto& [interval, net_id] : tracks.back()) {
-      std::cerr << "(" << interval.first << ", " << interval.second << ")\t"
-                << net_id << '\n';
-    }
-#endif
-  }
+  auto tracks = RoutedInTrack_(routed, number_of_routed_nets);
   return Result{
       .top_tracks = top_tracks,
       .tracks = tracks,
@@ -275,6 +214,72 @@ Router::RoutedInBottomTrack_(std::vector<bool>& routed,
 #endif
   }
   return bottom_tracks;
+}
+
+std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RoutedInTrack_(
+    std::vector<bool>& routed, unsigned& number_of_routed_nets) {
+  // On each track in the channel, first set the watermark to -1, then select
+  // the net with the smallest* start of interval from the horizontal constraint
+  // graph:
+  // (1) if the net is not routed and the watermark is less than the start of
+  //     the interval:
+  //   (a) if all the parents of the net are routed, route the net and set the
+  //       watermark to the end of the interval.
+  //   (b) if not all the parents of the net are routed, skip the net.
+  // (2) if the net is not routed and the watermark is greater than or equal to
+  //     the start of the interval, skip the net.
+  // (3) if the net is routed, skip the net.
+  //  If there's not more nets that are possible to be routed in this track, go
+  //  to the next track.
+  // * From those nets that are not skipped.
+
+  const auto number_of_nets = NumberOfNets_();
+  // On each track, several nets may be routed.
+  auto tracks = std::vector<std::vector<std::tuple<Interval, NetId>>>{};
+#ifdef DEBUG
+  std::cerr << "TRACKS\n";
+#endif
+  while (number_of_routed_nets < number_of_nets) {
+    assert(tracks.size() < number_of_nets
+        && "the worst routing result shall not have to use more tracks than the number of nets");
+    tracks.emplace_back();
+    auto watermark = -1;
+#ifdef DEBUG
+    std::cerr << "TRACK " << tracks.size() << '\n';
+#endif
+    for (const auto& [interval, net_id] : horizontal_constraint_graph_) {
+      if (routed.at(net_id)) {
+        continue;
+      }
+      if (watermark == -1
+          || interval.first > static_cast<unsigned>(watermark)) {
+        auto all_parents_routed = true;
+        for (auto parent : vertical_constraint_graph_.at(net_id)) {
+          if (!routed.at(parent)) {
+            all_parents_routed = false;
+#ifdef DEBUG
+            std::cerr << "Net " << net_id << " has parent " << parent
+                      << " not routed\n";
+#endif
+            break;
+          }
+        }
+        if (all_parents_routed) {
+          routed.at(net_id) = true;
+          number_of_routed_nets++;
+          watermark = interval.second;
+          tracks.back().emplace_back(interval, net_id);
+        }
+      }
+    }
+#ifdef DEBUG
+    for (const auto& [interval, net_id] : tracks.back()) {
+      std::cerr << "(" << interval.first << ", " << interval.second << ")\t"
+                << net_id << '\n';
+    }
+#endif
+  }
+  return tracks;
 }
 
 void Router::ConstructHorizontalConstraintGraph_() {

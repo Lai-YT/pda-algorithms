@@ -35,6 +35,10 @@ class Router {
       std::vector<bool>& routed, unsigned& number_of_routed_nets);
   std::vector<std::vector<std::tuple<Interval, NetId>>> RoutedInBottomTrack_(
       std::vector<bool>& routed, unsigned& number_of_routed_nets);
+  /// @brief Routes all remaining nets in the extra tracks in the channel.
+  /// @note Call this function after routing in the top and bottom tracks.
+  std::vector<std::vector<std::tuple<Interval, NetId>>> RoutedInTrack_(
+      std::vector<bool>& routed, unsigned& number_of_routed_nets);
 };
 
 }  // namespace routing
