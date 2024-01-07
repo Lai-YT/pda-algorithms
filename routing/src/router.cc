@@ -21,9 +21,9 @@ Result Router::Route() {
   auto routed
       = std::vector<bool>(NumberOfNets_() + 1 /* index 0 is not used */, false);
 
-  auto top_tracks = RoutedInTopTrack_(routed, number_of_routed_nets);
-  auto bottom_tracks = RoutedInBottomTrack_(routed, number_of_routed_nets);
-  auto tracks = RoutedInTrack_(routed, number_of_routed_nets);
+  auto top_tracks = RouteInTopTracks_(routed, number_of_routed_nets);
+  auto bottom_tracks = RouteInBottomTracks_(routed, number_of_routed_nets);
+  auto tracks = RouteInTracks_(routed, number_of_routed_nets);
   return Result{
       .top_tracks = top_tracks,
       .tracks = tracks,
@@ -31,7 +31,7 @@ Result Router::Route() {
   };
 }
 
-std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RoutedInTopTrack_(
+std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RouteInTopTracks_(
     std::vector<bool>& routed, unsigned& number_of_routed_nets) {
   // Since we are not using doglegs, the rectilinear boundaries are only
   // beneficial for those nets that sit exactly in the interval of a distance of
@@ -125,7 +125,7 @@ std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RoutedInTopTrack_(
 }
 
 std::vector<std::vector<std::tuple<Interval, NetId>>>
-Router::RoutedInBottomTrack_(std::vector<bool>& routed,
+Router::RouteInBottomTracks_(std::vector<bool>& routed,
                              unsigned& number_of_routed_nets) {
   // Top boundaries are straightforward, but bottom boundaries are not. The
   // vertical constraint graph has to be inverted, so that we can route the
@@ -216,7 +216,7 @@ Router::RoutedInBottomTrack_(std::vector<bool>& routed,
   return bottom_tracks;
 }
 
-std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RoutedInTrack_(
+std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RouteInTracks_(
     std::vector<bool>& routed, unsigned& number_of_routed_nets) {
   // On each track in the channel, first set the watermark to -1, then select
   // the net with the smallest* start of interval from the horizontal constraint

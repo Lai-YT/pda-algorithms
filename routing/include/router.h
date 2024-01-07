@@ -31,13 +31,13 @@ class Router {
 
   unsigned NumberOfNets_() const;
 
-  std::vector<std::vector<std::tuple<Interval, NetId>>> RoutedInTopTrack_(
+  std::vector<std::vector<std::tuple<Interval, NetId>>> RouteInTopTracks_(
       std::vector<bool>& routed, unsigned& number_of_routed_nets);
-  std::vector<std::vector<std::tuple<Interval, NetId>>> RoutedInBottomTrack_(
+  std::vector<std::vector<std::tuple<Interval, NetId>>> RouteInBottomTracks_(
       std::vector<bool>& routed, unsigned& number_of_routed_nets);
   /// @brief Routes all remaining nets in the extra tracks in the channel.
   /// @note Call this function after routing in the top and bottom tracks.
-  std::vector<std::vector<std::tuple<Interval, NetId>>> RoutedInTrack_(
+  std::vector<std::vector<std::tuple<Interval, NetId>>> RouteInTracks_(
       std::vector<bool>& routed, unsigned& number_of_routed_nets);
 };
 
