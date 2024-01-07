@@ -2,7 +2,6 @@
 #define ROUTING_ROUTER_H_
 
 #include <tuple>
-#include <utility>
 #include <vector>
 
 #include "instance.h"
@@ -40,8 +39,10 @@ class Router {
   /// @brief Constructs the VCG and the inverted VCG.
   void ConstructVerticalConstraintGraph_();
 
-  std::vector<std::vector<std::tuple<Interval, NetId>>> RouteInTopTracks_();
-  std::vector<std::vector<std::tuple<Interval, NetId>>> RouteInBottomTracks_();
+  /// @note Routing in the top and bottom tracks are in fact the same, except
+  /// that the bottom one uses the inverted VCG.
+  std::vector<std::vector<std::tuple<Interval, NetId>>> RouteInBoundaries_(
+      enum BoundaryKind);
   /// @brief Routes all remaining nets in the extra tracks in the channel.
   /// @note Call this function after routing in the top and bottom tracks.
   std::vector<std::vector<std::tuple<Interval, NetId>>> RouteInTracks_();

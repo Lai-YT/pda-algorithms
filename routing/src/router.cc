@@ -4,6 +4,7 @@
 #include <cassert>
 #include <list>
 
+#include "instance.h"
 #include "util.h"
 
 #ifdef DEBUG
@@ -31,8 +32,8 @@ Result Router::Route() {
   ConstructHorizontalConstraintGraph_();
   ConstructVerticalConstraintGraph_();
 
-  auto top_tracks = RouteInTopTracks_();
-  auto bottom_tracks = RouteInBottomTracks_();
+  auto top_tracks = RouteInBoundaries_(BoundaryKind::kTop);
+  auto bottom_tracks = RouteInBoundaries_(BoundaryKind::kBottom);
   auto tracks = RouteInTracks_();
   return Result{
       .top_tracks = top_tracks,
@@ -47,30 +48,44 @@ void Router::ResetRoutedNets_() {
 }
 
 std::vector<std::vector<std::tuple<Interval, NetId>>>
-Router::RouteInTopTracks_() {
+Router::RouteInBoundaries_(enum BoundaryKind boundary_kind) {
   // Since we are not using doglegs, the rectilinear boundaries are only
   // beneficial for those nets that sit exactly in the interval of a distance of
   // boundary. Boundary of a distance may be multiple pieced, boundaries with
   // distance farther are also beneficial.
-  auto top_rectilinear_boundaries = std::list<Interval>{};
+  // Top boundaries are straightforward, but bottom boundaries are not. The
+  // vertical constraint graph has to be inverted, so that we can route the
+  // bottom boundaries in the same way as the top boundaries without violating
+  // the constraint.
+
+  auto rectilinear_boundaries = std::list<Interval>{};
   /// @note These tracks aren't additional tracks. They use the space of the
   /// boundary. The index is the distance from the innermost boundary.
-  auto top_tracks = std::vector<std::vector<std::tuple<Interval, NetId>>>(
-      instance_.top_boundaries.size() - 1);
+  auto tracks = std::vector<std::vector<std::tuple<Interval, NetId>>>(
+      boundary_kind == BoundaryKind::kTop
+          ? instance_.top_boundaries.size() - 1
+          : instance_.bottom_boundaries.size() - 1);
+  const auto& vcg = boundary_kind == BoundaryKind::kTop
+                        ? vertical_constraint_graph_
+                        : inverted_vertical_constraint_graph_;
+  const auto& boundaries = boundary_kind == BoundaryKind::kTop
+                               ? instance_.top_boundaries
+                               : instance_.bottom_boundaries;
 #ifdef DEBUG
-  std::cerr << "TOP TRACKS\n";
+  std::cerr << (boundary_kind == BoundaryKind::kTop ? "TOP" : "BOTTOM")
+            << " TRACKS\n";
 #endif
-  for (auto dist = instance_.top_boundaries.size() - 1;
-       dist > 0 /* 0 is the general case */; dist--) {
+  for (auto dist = tracks.size(); dist > 0 /* 0 is the general case */;
+       dist--) {
     // Since the intervals are sorted by the start of the interval, we can do an
     // insertion sort along with the merge to make sure adjacent intervals are
     // treated as one.
-    auto it = top_rectilinear_boundaries.begin();
-    for (const auto& interval : instance_.top_boundaries.at(dist)) {
+    auto it = rectilinear_boundaries.begin();
+    for (const auto& interval : boundaries.at(dist)) {
       while (true) {
-        if (it == top_rectilinear_boundaries.end()) {
-          top_rectilinear_boundaries.push_back(interval);
-          it = top_rectilinear_boundaries.begin();
+        if (it == rectilinear_boundaries.end()) {
+          rectilinear_boundaries.push_back(interval);
+          it = rectilinear_boundaries.begin();
           break;
         }
         if (IsAdjacent(interval, *it)) {
@@ -80,7 +95,7 @@ Router::RouteInTopTracks_() {
         if (interval.second < it->first) {
           // Since we've checked the one before it, interval must be the one
           // right before it.
-          top_rectilinear_boundaries.insert(it, interval);
+          rectilinear_boundaries.insert(it, interval);
           break;
         }
         // The interval is after it. We need to find the exact place to insert
@@ -90,26 +105,28 @@ Router::RouteInTopTracks_() {
     }
 #ifdef DEBUG
     // Routed at dist - 1.
-    std::cerr << "Top intervals " << dist << '\t';
-    for (const auto& interval : top_rectilinear_boundaries) {
+    std::cerr << (boundary_kind == BoundaryKind::kTop ? "Top" : "Bottom")
+              << " intervals " << dist << '\t';
+    for (const auto& interval : rectilinear_boundaries) {
       std::cerr << "(" << interval.first << ", " << interval.second << ") ";
     }
     std::cerr << '\n';
 #endif
     auto watermark = -1;
 #ifdef DEBUG
-    std::cerr << "TOP TRACK " << dist - 1 << '\n';
+    std::cerr << (boundary_kind == BoundaryKind::kTop ? "TOP" : "BOTTOM")
+              << " TRACK " << dist - 1 << '\n';
 #endif
     for (const auto& [interval, net_id] : horizontal_constraint_graph_) {
       if (routed_nets_.at(net_id)) {
         continue;
       }
-      for (const auto& boundary : top_rectilinear_boundaries) {
+      for (const auto& boundary : rectilinear_boundaries) {
         if (IsContainedBy(interval, boundary)) {
           if (watermark == -1
               || interval.first > static_cast<unsigned>(watermark)) {
             auto all_parents_routed = true;
-            for (auto parent : vertical_constraint_graph_.at(net_id)) {
+            for (auto parent : vcg.at(net_id)) {
               if (!routed_nets_.at(parent)) {
                 all_parents_routed = false;
 #ifdef DEBUG
@@ -123,111 +140,20 @@ Router::RouteInTopTracks_() {
               routed_nets_.at(net_id) = true;
               number_of_routed_nets_++;
               watermark = interval.second;
-              top_tracks.at(dist - 1).emplace_back(interval, net_id);
+              tracks.at(dist - 1).emplace_back(interval, net_id);
             }
           }
         }
       }
     }
 #ifdef DEBUG
-    for (const auto& [interval, net_id] : top_tracks.at(dist - 1)) {
+    for (const auto& [interval, net_id] : tracks.at(dist - 1)) {
       std::cerr << "(" << interval.first << ", " << interval.second << ")\t"
                 << net_id << '\n';
     }
 #endif
   }
-  return top_tracks;
-}
-
-std::vector<std::vector<std::tuple<Interval, NetId>>>
-Router::RouteInBottomTracks_() {
-  // Top boundaries are straightforward, but bottom boundaries are not. The
-  // vertical constraint graph has to be inverted, so that we can route the
-  // bottom boundaries in the same way as the top boundaries without violating
-  // the constraint.
-  auto bottom_rectilinear_boundaries = std::list<Interval>{};
-  auto bottom_tracks = std::vector<std::vector<std::tuple<Interval, NetId>>>(
-      instance_.bottom_boundaries.size() - 1);
-#ifdef DEBUG
-  std::cerr << "BOTTOM TRACKS\n";
-#endif
-  for (auto dist = instance_.bottom_boundaries.size() - 1;
-       dist > 0 /* 0 is the general case */; dist--) {
-    // Since the intervals are sorted by the start of the interval, we can do an
-    // insertion sort along with the merge to make sure adjacent intervals are
-    // treated as one.
-    auto it = bottom_rectilinear_boundaries.begin();
-    for (const auto& interval : instance_.bottom_boundaries.at(dist)) {
-      while (true) {
-        if (it == bottom_rectilinear_boundaries.end()) {
-          bottom_rectilinear_boundaries.push_back(interval);
-          it = bottom_rectilinear_boundaries.begin();
-          break;
-        }
-        if (IsAdjacent(interval, *it)) {
-          *it = Union(interval, *it);
-          break;
-        }
-        if (interval.second < it->first) {
-          // Since we've checked the one before it, interval must be the one
-          // right before it.
-          bottom_rectilinear_boundaries.insert(it, interval);
-          break;
-        }
-        // The interval is after it. We need to find the exact place to insert
-        // it.
-        ++it;
-      }
-    }
-#ifdef DEBUG
-    // Routed at dist - 1.
-    std::cerr << "Bottom intervals " << dist << '\t';
-    for (const auto& interval : bottom_rectilinear_boundaries) {
-      std::cerr << "(" << interval.first << ", " << interval.second << ") ";
-    }
-    std::cerr << '\n';
-#endif
-    auto watermark = -1;
-#ifdef DEBUG
-    std::cerr << "BOTTOM TRACK " << dist - 1 << '\n';
-#endif
-    for (const auto& [interval, net_id] : horizontal_constraint_graph_) {
-      if (routed_nets_.at(net_id)) {
-        continue;
-      }
-      for (const auto& boundary : bottom_rectilinear_boundaries) {
-        if (IsContainedBy(interval, boundary)) {
-          if (watermark == -1
-              || interval.first > static_cast<unsigned>(watermark)) {
-            auto all_children_routed = true;
-            for (auto child : inverted_vertical_constraint_graph_.at(net_id)) {
-              if (!routed_nets_.at(child)) {
-                all_children_routed = false;
-#ifdef DEBUG
-                std::cerr << "Net " << net_id << " has child " << child
-                          << " not routed\n";
-#endif
-                break;
-              }
-            }
-            if (all_children_routed) {
-              routed_nets_.at(net_id) = true;
-              number_of_routed_nets_++;
-              watermark = interval.second;
-              bottom_tracks.at(dist - 1).emplace_back(interval, net_id);
-            }
-          }
-        }
-      }
-    }
-#ifdef DEBUG
-    for (const auto& [interval, net_id] : bottom_tracks.at(dist - 1)) {
-      std::cerr << "(" << interval.first << ", " << interval.second << ")\t"
-                << net_id << '\n';
-    }
-#endif
-  }
-  return bottom_tracks;
+  return tracks;
 }
 
 std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RouteInTracks_() {
