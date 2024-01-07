@@ -27,6 +27,9 @@ class Router {
   void ConstructVerticalConstraintGraph_();
 
   unsigned NumberOfNets_() const;
+
+  std::vector<std::vector<std::tuple<Interval, NetId>>> RoutedInTopTrack_(
+      std::vector<bool>& routed, unsigned& number_of_routed_nets);
 };
 
 }  // namespace routing
