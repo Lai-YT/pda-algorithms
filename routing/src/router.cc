@@ -12,18 +12,26 @@
 
 using namespace routing;
 
+Router::Router(Instance instance)
+    : instance_{std::move(instance)},
+      number_of_nets_{
+          // The id of the nets are guaranteed to be positive (0 is not a net
+          // id) and
+          // consecutive. Thus, the largest net id is the number of nets.
+          std::max(*std::max_element(instance_.top_net_ids.begin(),
+                                     instance_.top_net_ids.end()),
+                   *std::max_element(instance_.bottom_net_ids.begin(),
+                                     instance_.bottom_net_ids.end()))},
+      routed_nets_(number_of_nets_ + 1 /* index 0 is not used */, false) {}
+
 Result Router::Route() {
   assert(instance_.top_net_ids.size() == instance_.bottom_net_ids.size());
   ConstructHorizontalConstraintGraph_();
   ConstructVerticalConstraintGraph_();
 
-  auto number_of_routed_nets = 0u;
-  auto routed
-      = std::vector<bool>(NumberOfNets_() + 1 /* index 0 is not used */, false);
-
-  auto top_tracks = RouteInTopTracks_(routed, number_of_routed_nets);
-  auto bottom_tracks = RouteInBottomTracks_(routed, number_of_routed_nets);
-  auto tracks = RouteInTracks_(routed, number_of_routed_nets);
+  auto top_tracks = RouteInTopTracks_();
+  auto bottom_tracks = RouteInBottomTracks_();
+  auto tracks = RouteInTracks_();
   return Result{
       .top_tracks = top_tracks,
       .tracks = tracks,
@@ -31,8 +39,13 @@ Result Router::Route() {
   };
 }
 
-std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RouteInTopTracks_(
-    std::vector<bool>& routed, unsigned& number_of_routed_nets) {
+void Router::ResetRoutedNets_() {
+  number_of_routed_nets_ = 0u;
+  std::fill(routed_nets_.begin(), routed_nets_.end(), false);
+}
+
+std::vector<std::vector<std::tuple<Interval, NetId>>>
+Router::RouteInTopTracks_() {
   // Since we are not using doglegs, the rectilinear boundaries are only
   // beneficial for those nets that sit exactly in the interval of a distance of
   // boundary. Boundary of a distance may be multiple pieced, boundaries with
@@ -86,7 +99,7 @@ std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RouteInTopTracks_(
     std::cerr << "TOP TRACK " << dist - 1 << '\n';
 #endif
     for (const auto& [interval, net_id] : horizontal_constraint_graph_) {
-      if (routed.at(net_id)) {
+      if (routed_nets_.at(net_id)) {
         continue;
       }
       for (const auto& boundary : top_rectilinear_boundaries) {
@@ -95,7 +108,7 @@ std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RouteInTopTracks_(
               || interval.first > static_cast<unsigned>(watermark)) {
             auto all_parents_routed = true;
             for (auto parent : vertical_constraint_graph_.at(net_id)) {
-              if (!routed.at(parent)) {
+              if (!routed_nets_.at(parent)) {
                 all_parents_routed = false;
 #ifdef DEBUG
                 std::cerr << "Net " << net_id << " has parent " << parent
@@ -105,8 +118,8 @@ std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RouteInTopTracks_(
               }
             }
             if (all_parents_routed) {
-              routed.at(net_id) = true;
-              number_of_routed_nets++;
+              routed_nets_.at(net_id) = true;
+              number_of_routed_nets_++;
               watermark = interval.second;
               top_tracks.at(dist - 1).emplace_back(interval, net_id);
             }
@@ -125,8 +138,7 @@ std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RouteInTopTracks_(
 }
 
 std::vector<std::vector<std::tuple<Interval, NetId>>>
-Router::RouteInBottomTracks_(std::vector<bool>& routed,
-                             unsigned& number_of_routed_nets) {
+Router::RouteInBottomTracks_() {
   // Top boundaries are straightforward, but bottom boundaries are not. The
   // vertical constraint graph has to be inverted, so that we can route the
   // bottom boundaries in the same way as the top boundaries without violating
@@ -178,7 +190,7 @@ Router::RouteInBottomTracks_(std::vector<bool>& routed,
     std::cerr << "BOTTOM TRACK " << dist - 1 << '\n';
 #endif
     for (const auto& [interval, net_id] : horizontal_constraint_graph_) {
-      if (routed.at(net_id)) {
+      if (routed_nets_.at(net_id)) {
         continue;
       }
       for (const auto& boundary : bottom_rectilinear_boundaries) {
@@ -187,7 +199,7 @@ Router::RouteInBottomTracks_(std::vector<bool>& routed,
               || interval.first > static_cast<unsigned>(watermark)) {
             auto all_children_routed = true;
             for (auto child : inverted_vertical_constraint_graph_.at(net_id)) {
-              if (!routed.at(child)) {
+              if (!routed_nets_.at(child)) {
                 all_children_routed = false;
 #ifdef DEBUG
                 std::cerr << "Net " << net_id << " has child " << child
@@ -197,8 +209,8 @@ Router::RouteInBottomTracks_(std::vector<bool>& routed,
               }
             }
             if (all_children_routed) {
-              routed.at(net_id) = true;
-              number_of_routed_nets++;
+              routed_nets_.at(net_id) = true;
+              number_of_routed_nets_++;
               watermark = interval.second;
               bottom_tracks.at(dist - 1).emplace_back(interval, net_id);
             }
@@ -216,8 +228,7 @@ Router::RouteInBottomTracks_(std::vector<bool>& routed,
   return bottom_tracks;
 }
 
-std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RouteInTracks_(
-    std::vector<bool>& routed, unsigned& number_of_routed_nets) {
+std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RouteInTracks_() {
   // On each track in the channel, first set the watermark to -1, then select
   // the net with the smallest* start of interval from the horizontal constraint
   // graph:
@@ -233,14 +244,13 @@ std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RouteInTracks_(
   //  to the next track.
   // * From those nets that are not skipped.
 
-  const auto number_of_nets = NumberOfNets_();
   // On each track, several nets may be routed.
   auto tracks = std::vector<std::vector<std::tuple<Interval, NetId>>>{};
 #ifdef DEBUG
   std::cerr << "TRACKS\n";
 #endif
-  while (number_of_routed_nets < number_of_nets) {
-    assert(tracks.size() < number_of_nets
+  while (number_of_routed_nets_ < number_of_nets_) {
+    assert(tracks.size() < number_of_nets_
         && "the worst routing result shall not have to use more tracks than the number of nets");
     tracks.emplace_back();
     auto watermark = -1;
@@ -248,14 +258,14 @@ std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RouteInTracks_(
     std::cerr << "TRACK " << tracks.size() << '\n';
 #endif
     for (const auto& [interval, net_id] : horizontal_constraint_graph_) {
-      if (routed.at(net_id)) {
+      if (routed_nets_.at(net_id)) {
         continue;
       }
       if (watermark == -1
           || interval.first > static_cast<unsigned>(watermark)) {
         auto all_parents_routed = true;
         for (auto parent : vertical_constraint_graph_.at(net_id)) {
-          if (!routed.at(parent)) {
+          if (!routed_nets_.at(parent)) {
             all_parents_routed = false;
 #ifdef DEBUG
             std::cerr << "Net " << net_id << " has parent " << parent
@@ -265,8 +275,8 @@ std::vector<std::vector<std::tuple<Interval, NetId>>> Router::RouteInTracks_(
           }
         }
         if (all_parents_routed) {
-          routed.at(net_id) = true;
-          number_of_routed_nets++;
+          routed_nets_.at(net_id) = true;
+          number_of_routed_nets_++;
           watermark = interval.second;
           tracks.back().emplace_back(interval, net_id);
         }
@@ -287,9 +297,8 @@ void Router::ConstructHorizontalConstraintGraph_() {
   // the bottom. For each net id, find its smallest and largest index in the mix
   // top and bottom boundaries.
 
-  const auto number_of_nets = NumberOfNets_();
   auto interval_of_nets
-      = std::vector<Interval>(number_of_nets + 1 /* index 0 is not used */);
+      = std::vector<Interval>(number_of_nets_ + 1 /* index 0 is not used */);
   std::fill(interval_of_nets.begin(), interval_of_nets.end(),
             Interval{instance_.top_net_ids.size() - 1, 0});
   for (auto i = std::size_t{0}, e = instance_.top_net_ids.size(); i < e; i++) {
@@ -309,7 +318,7 @@ void Router::ConstructHorizontalConstraintGraph_() {
   // Sort the intervals by the start of the interval.
   // 0 is skipped. It's fine that we've take 0 into account in the previous
   // step.
-  for (auto net_id = 1u; net_id <= number_of_nets; net_id++) {
+  for (auto net_id = 1u; net_id <= number_of_nets_; net_id++) {
     horizontal_constraint_graph_.emplace_back(interval_of_nets.at(net_id),
                                               net_id);
   }
@@ -332,10 +341,9 @@ void Router::ConstructVerticalConstraintGraph_() {
   // of the bottom boundary, m be the net at index i of the top boundary. If n
   // != m, then m is a parent of n.
 
-  auto number_of_nets = NumberOfNets_();
-  vertical_constraint_graph_.resize(number_of_nets
+  vertical_constraint_graph_.resize(number_of_nets_
                                     + 1 /* index 0 is not used */);
-  inverted_vertical_constraint_graph_.resize(number_of_nets
+  inverted_vertical_constraint_graph_.resize(number_of_nets_
                                              + 1 /* index 0 is not used */);
   for (auto i = std::size_t{0}, e = instance_.top_net_ids.size(); i < e; i++) {
     auto top_net_id = instance_.top_net_ids.at(i);
@@ -372,7 +380,7 @@ void Router::ConstructVerticalConstraintGraph_() {
   }
 #ifdef DEBUG
   std::cerr << "VERTICAL CONSTRAINT GRAPH\n";
-  for (auto net_id = 1u; net_id <= number_of_nets; net_id++) {
+  for (auto net_id = 1u; net_id <= number_of_nets_; net_id++) {
     std::cerr << net_id << ": ";
     for (auto parent : vertical_constraint_graph_.at(net_id)) {
       std::cerr << parent << " ";
@@ -380,7 +388,7 @@ void Router::ConstructVerticalConstraintGraph_() {
     std::cerr << '\n';
   }
   std::cerr << "INVERTED VERTICAL CONSTRAINT GRAPH\n";
-  for (auto net_id = 1u; net_id <= number_of_nets; net_id++) {
+  for (auto net_id = 1u; net_id <= number_of_nets_; net_id++) {
     std::cerr << net_id << ": ";
     for (auto parent : inverted_vertical_constraint_graph_.at(net_id)) {
       std::cerr << parent << " ";
@@ -388,13 +396,4 @@ void Router::ConstructVerticalConstraintGraph_() {
     std::cerr << '\n';
   }
 #endif
-}
-
-unsigned Router::NumberOfNets_() const {
-  // The id of the nets are guaranteed to be positive (0 is not a net id) and
-  // consecutive. Thus, the largest net id is the number of nets.
-  return std::max(*std::max_element(instance_.top_net_ids.begin(),
-                                    instance_.top_net_ids.end()),
-                  *std::max_element(instance_.bottom_net_ids.begin(),
-                                    instance_.bottom_net_ids.end()));
 }

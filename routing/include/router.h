@@ -12,9 +12,11 @@ namespace routing {
 
 class Router {
  public:
+  /// @note This function is safe to call multiple times. Although the result
+  /// will be the same.
   Result Route();
 
-  explicit Router(Instance instance) : instance_{std::move(instance)} {}
+  explicit Router(Instance);
 
  private:
   Instance instance_;
@@ -25,20 +27,23 @@ class Router {
   /// @note Inverted VCG for routing in the bottom track.
   std::vector<std::vector<NetId>> inverted_vertical_constraint_graph_{};
 
+  const unsigned number_of_nets_;
+  unsigned number_of_routed_nets_ = 0u;
+  std::vector<bool> routed_nets_;
+
+  /// @brief Reset all the nets as not routed, so that the routing function can
+  /// be called multiple time.
+  void ResetRoutedNets_();
+
   void ConstructHorizontalConstraintGraph_();
   /// @brief Constructs the VCG and the inverted VCG.
   void ConstructVerticalConstraintGraph_();
 
-  unsigned NumberOfNets_() const;
-
-  std::vector<std::vector<std::tuple<Interval, NetId>>> RouteInTopTracks_(
-      std::vector<bool>& routed, unsigned& number_of_routed_nets);
-  std::vector<std::vector<std::tuple<Interval, NetId>>> RouteInBottomTracks_(
-      std::vector<bool>& routed, unsigned& number_of_routed_nets);
+  std::vector<std::vector<std::tuple<Interval, NetId>>> RouteInTopTracks_();
+  std::vector<std::vector<std::tuple<Interval, NetId>>> RouteInBottomTracks_();
   /// @brief Routes all remaining nets in the extra tracks in the channel.
   /// @note Call this function after routing in the top and bottom tracks.
-  std::vector<std::vector<std::tuple<Interval, NetId>>> RouteInTracks_(
-      std::vector<bool>& routed, unsigned& number_of_routed_nets);
+  std::vector<std::vector<std::tuple<Interval, NetId>>> RouteInTracks_();
 };
 
 }  // namespace routing
