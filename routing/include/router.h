@@ -28,6 +28,7 @@ class Router {
   std::vector<std::vector<NetId>> inverted_vertical_constraint_graph_{};
 
   const unsigned number_of_nets_;
+  const unsigned number_of_pins_;
   unsigned number_of_routed_nets_ = 0u;
   std::vector<bool> routed_nets_;
 

@@ -22,10 +22,12 @@ Router::Router(Instance instance)
                                      instance_.top_net_ids.end()),
                    *std::max_element(instance_.bottom_net_ids.begin(),
                                      instance_.bottom_net_ids.end()))},
-      routed_nets_(number_of_nets_ + 1 /* index 0 is not used */, false) {}
+      number_of_pins_{static_cast<unsigned>(instance_.top_net_ids.size())},
+      routed_nets_(number_of_nets_ + 1 /* index 0 is not used */, false) {
+  assert(instance_.top_net_ids.size() == instance_.bottom_net_ids.size());
+}
 
 Result Router::Route() {
-  assert(instance_.top_net_ids.size() == instance_.bottom_net_ids.size());
   ConstructHorizontalConstraintGraph_();
   ConstructVerticalConstraintGraph_();
 
@@ -298,10 +300,9 @@ void Router::ConstructHorizontalConstraintGraph_() {
   // top and bottom boundaries.
 
   auto interval_of_nets
-      = std::vector<Interval>(number_of_nets_ + 1 /* index 0 is not used */);
-  std::fill(interval_of_nets.begin(), interval_of_nets.end(),
-            Interval{instance_.top_net_ids.size() - 1, 0});
-  for (auto i = std::size_t{0}, e = instance_.top_net_ids.size(); i < e; i++) {
+      = std::vector<Interval>(number_of_nets_ + 1 /* index 0 is not used */,
+                              Interval{number_of_pins_ - 1, 0});
+  for (auto i = std::size_t{0}; i < number_of_pins_; i++) {
     {
       auto top_net_id = instance_.top_net_ids.at(i);
       auto& interval = interval_of_nets.at(top_net_id);
@@ -345,7 +346,7 @@ void Router::ConstructVerticalConstraintGraph_() {
                                     + 1 /* index 0 is not used */);
   inverted_vertical_constraint_graph_.resize(number_of_nets_
                                              + 1 /* index 0 is not used */);
-  for (auto i = std::size_t{0}, e = instance_.top_net_ids.size(); i < e; i++) {
+  for (auto i = std::size_t{0}; i < number_of_pins_; i++) {
     auto top_net_id = instance_.top_net_ids.at(i);
     auto bottom_net_id = instance_.bottom_net_ids.at(i);
     if (top_net_id == kEmptySlot || bottom_net_id == kEmptySlot) {
