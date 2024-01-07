@@ -22,13 +22,18 @@ class Router {
   std::vector<std::tuple<Interval, NetId>> horizontal_constraint_graph_{};
   /// @note The index of the vector is the net id.
   std::vector<std::vector<NetId>> vertical_constraint_graph_{};
+  /// @note Inverted VCG for routing in the bottom track.
+  std::vector<std::vector<NetId>> inverted_vertical_constraint_graph_{};
 
   void ConstructHorizontalConstraintGraph_();
+  /// @brief Constructs the VCG and the inverted VCG.
   void ConstructVerticalConstraintGraph_();
 
   unsigned NumberOfNets_() const;
 
   std::vector<std::vector<std::tuple<Interval, NetId>>> RoutedInTopTrack_(
+      std::vector<bool>& routed, unsigned& number_of_routed_nets);
+  std::vector<std::vector<std::tuple<Interval, NetId>>> RoutedInBottomTrack_(
       std::vector<bool>& routed, unsigned& number_of_routed_nets);
 };
 
