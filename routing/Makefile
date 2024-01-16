@@ -1,4 +1,4 @@
-TARGET := Lab4
+TARGET := Routing
 CXX := g++
 CC = $(CXX)
 CXXFLAGS = -g3 -std=c++2a -Wall -MMD -Iinclude -Wpedantic -Wextra
