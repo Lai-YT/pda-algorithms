@@ -2,7 +2,7 @@
 
 ## 🧐 About
 
-This subproject conducts slicing [floorplanning](https://en.wikipedia.org/wiki/Floorplan_(microelectronics)#Sliceable_floorplans) using the slicing tree structure and the simulated annealing algorithm.
+This subproject conducts [slicing floorplanning](https://en.wikipedia.org/wiki/Floorplan_(microelectronics)#Sliceable_floorplans) using the slicing tree structure and the simulated annealing algorithm.
 
 > [!note]
 > - Optimization focuses on chip area, disregarding net wirelength.
